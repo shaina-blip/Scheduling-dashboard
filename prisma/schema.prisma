@@ -1,0 +1,158 @@
+// Wildewood COO Dashboard — data model
+// All app data is scoped per user via `userEmail` so the dashboard works for
+// one operator today and is ready for multiple staff later.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// --- Ideas & long-term projects ("parking lot") ---------------------------
+enum IdeaKind {
+  IDEA
+  PROJECT
+}
+
+enum IdeaStatus {
+  PARKED
+  ACTIVE
+  DONE
+}
+
+model Idea {
+  id          String     @id @default(cuid())
+  userEmail   String
+  title       String
+  details     String?
+  kind        IdeaKind   @default(IDEA)
+  status      IdeaStatus @default(PARKED)
+  priority    Int        @default(0) // 0 = normal, 1 = high
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userEmail, status])
+}
+
+// --- Reminders (inventory, KPIs to review, recurring ops) ------------------
+enum Recurrence {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+}
+
+model Reminder {
+  id          String     @id @default(cuid())
+  userEmail   String
+  title       String
+  notes       String?
+  category    String?    // e.g. "Inventory", "KPIs", "Compliance"
+  dueDate     DateTime?
+  recurrence  Recurrence @default(NONE)
+  done        Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userEmail, done, dueDate])
+}
+
+// --- Students (imported from TeachWorks exports or added manually) ---------
+enum StudentStatus {
+  NEW
+  ACTIVE
+  INACTIVE
+}
+
+model Student {
+  id                 String        @id @default(cuid())
+  userEmail          String
+  name               String
+  instructor         String?
+  status             StudentStatus @default(NEW)
+  startDate          DateTime?
+  source             String        @default("manual") // "manual" | "teachworks"
+  externalId         String?       // TeachWorks id when available, for dedupe
+  // Operational follow-up flags
+  instructorNotified Boolean       @default(false) // did COO email the instructor?
+  notesComplete      Boolean       @default(false) // student notes doc filled out?
+  collegeLaunch      Boolean       @default(false) // enrolled in College Launch?
+  collegeLaunchUpdate Boolean      @default(false) // update owed to family?
+  notesDocUrl        String?       // link to the Google Doc for this student
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@unique([userEmail, externalId])
+  @@index([userEmail, status])
+}
+
+// --- Schedule items (pending sessions from TeachWorks exports) -------------
+enum ScheduleStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model ScheduleItem {
+  id          String         @id @default(cuid())
+  userEmail   String
+  studentName String
+  instructor  String?
+  subject     String?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  location    String?
+  status      ScheduleStatus @default(PENDING)
+  source      String         @default("teachworks")
+  externalId  String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([userEmail, externalId])
+  @@index([userEmail, status, startsAt])
+}
+
+// --- KPIs ------------------------------------------------------------------
+model Kpi {
+  id          String   @id @default(cuid())
+  userEmail   String
+  name        String
+  value       Float    @default(0)
+  target      Float?
+  unit        String?  // "$", "students", "%", "hrs"
+  period      String?  // "Weekly", "Monthly", "Quarterly"
+  higherIsBetter Boolean @default(true)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([userEmail])
+}
+
+// --- Dismissed emails (which Gmail threads the COO has already handled) -----
+model DismissedEmail {
+  id          String   @id @default(cuid())
+  userEmail   String
+  gmailId     String
+  createdAt   DateTime @default(now())
+
+  @@unique([userEmail, gmailId])
+}
+
+// --- Import audit log ------------------------------------------------------
+model ImportLog {
+  id          String   @id @default(cuid())
+  userEmail   String
+  kind        String   // "teachworks-students" | "teachworks-schedule"
+  fileName    String?
+  created     Int      @default(0)
+  updated     Int      @default(0)
+  skipped     Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([userEmail, createdAt])
+}

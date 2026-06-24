@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+html,
+body {
+  @apply bg-stone-50 text-stone-800 antialiased;
+}
+
+/* Thin scrollbars inside scrollable widget bodies */
+.scroll-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  @apply bg-stone-300 rounded-full;
+}
