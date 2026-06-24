@@ -137,7 +137,7 @@ export default function StudentsWidget({
                     </span>
                     {s.status === "NEW" && <Pill tone="blue">New</Pill>}
                     {s.collegeLaunch && (
-                      <Pill tone="violet">College Launch</Pill>
+                      <Pill tone="plum">College Launch</Pill>
                     )}
                   </div>
                   {s.instructor && (

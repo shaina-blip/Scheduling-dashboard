@@ -37,7 +37,7 @@ export default function IdeasWidget({ ideas }: { ideas: IdeaView[] }) {
       title="Ideas & Projects"
       icon={<Lightbulb className="h-4 w-4" />}
       count={ideas.filter((i) => i.status !== "DONE").length}
-      accent="amber"
+      accent="gold"
       action={
         <button
           onClick={() => setShowForm((v) => !v)}

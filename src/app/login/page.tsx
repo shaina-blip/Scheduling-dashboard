@@ -15,8 +15,8 @@ function LoginInner() {
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-100">
           <GraduationCap className="h-7 w-7 text-brand-700" />
         </div>
-        <h1 className="text-2xl font-semibold text-stone-900">
-          Wildewood COO Dashboard
+        <h1 className="font-display text-3xl tracking-wide text-stone-800">
+          Wildewood
         </h1>
         <p className="mt-2 text-sm text-stone-500">
           Your morning command center — emails, schedules, students, ideas,
