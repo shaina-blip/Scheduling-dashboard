@@ -19,7 +19,7 @@ export default function Header({
             <GraduationCap className="h-5 w-5 text-brand-600" />
           </div>
           <div>
-            <p className="font-display text-lg leading-tight tracking-wide text-stone-700">
+            <p className="font-display text-lg leading-tight tracking-wide text-stone-900">
               Wildewood
             </p>
             <p className="text-xs text-stone-500">{greeting}, {name}.</p>

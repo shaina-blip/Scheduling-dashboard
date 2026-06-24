@@ -17,24 +17,32 @@ export function Card({
   children: React.ReactNode;
   id?: string;
 }) {
-  const accents: Record<string, string> = {
-    stone: "text-stone-400",
-    brand: "text-brand-500",
-    green: "text-wild-greenDk",
-    gold: "text-[#c79a16]",
-    blue: "text-wild-blue",
-    plum: "text-wild-plum",
-    teal: "text-wild-teal",
+  // Cute "sticker" icon chips — a confident pop of color per section
+  const chip: Record<string, string> = {
+    stone: "bg-stone-100 text-stone-500",
+    brand: "bg-brand-100 text-brand-600",
+    green: "bg-emerald-100 text-wild-greenDk",
+    gold: "bg-amber-100 text-[#b8860b]",
+    blue: "bg-sky-100 text-wild-blue",
+    plum: "bg-fuchsia-100 text-wild-plum",
+    teal: "bg-teal-100 text-wild-teal",
   };
   return (
     <section
       id={id}
-      className="flex flex-col rounded-3xl border border-stone-100 bg-white/80 shadow-soft backdrop-blur-sm scroll-mt-24"
+      className="flex flex-col rounded-3xl border border-stone-100 bg-white/85 shadow-soft backdrop-blur-sm transition-shadow hover:shadow-[0_8px_30px_rgba(110,56,72,0.10)] scroll-mt-24"
     >
       <header className="flex items-center justify-between gap-2 border-b border-stone-100 px-5 py-3.5">
-        <div className="flex items-center gap-2">
-          <span className={accents[accent]}>{icon}</span>
-          <h2 className="font-display text-[15px] tracking-wide text-stone-700">
+        <div className="flex items-center gap-2.5">
+          <span
+            className={clsx(
+              "flex h-7 w-7 items-center justify-center rounded-xl",
+              chip[accent],
+            )}
+          >
+            {icon}
+          </span>
+          <h2 className="font-display text-[15px] tracking-wide text-stone-900">
             {title}
           </h2>
           {typeof count === "number" && (
