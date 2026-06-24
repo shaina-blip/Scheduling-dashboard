@@ -15,12 +15,12 @@ export default function Header({
     <header className="sticky top-0 z-20 border-b border-stone-200 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-100">
-            <GraduationCap className="h-5 w-5 text-brand-700" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-100 to-wild-green/20">
+            <GraduationCap className="h-5 w-5 text-brand-600" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-stone-900">
-              Wildewood COO Dashboard
+            <p className="font-display text-lg leading-tight tracking-wide text-stone-700">
+              Wildewood
             </p>
             <p className="text-xs text-stone-500">{greeting}, {name}.</p>
           </div>

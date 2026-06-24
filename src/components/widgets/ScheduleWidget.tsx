@@ -24,7 +24,7 @@ export default function ScheduleWidget({ items }: { items: ScheduleView[] }) {
       title="Pending schedules"
       icon={<CalendarClock className="h-4 w-4" />}
       count={items.length}
-      accent="violet"
+      accent="plum"
     >
       {items.length === 0 ? (
         <Empty>No sessions awaiting confirmation.</Empty>
@@ -50,7 +50,7 @@ export default function ScheduleWidget({ items }: { items: ScheduleView[] }) {
                   {it.location && ` · ${it.location}`}
                 </p>
               </div>
-              <Pill tone="amber">Pending</Pill>
+              <Pill tone="gold">Pending</Pill>
               <div className="flex shrink-0 gap-1">
                 <button
                   title="Confirm"

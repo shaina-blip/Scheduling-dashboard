@@ -14,6 +14,7 @@ import {
 import { getSuggestions } from "@/lib/ai";
 
 import Header from "@/components/Header";
+import AffirmationBlock from "@/components/AffirmationBlock";
 import SuggestionsPanel from "@/components/widgets/SuggestionsPanel";
 import EmailsWidget from "@/components/widgets/EmailsWidget";
 import ScheduleWidget from "@/components/widgets/ScheduleWidget";
@@ -91,6 +92,7 @@ export default async function DashboardPage() {
       <Header name={firstName} greeting={greetingFor(new Date())} />
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-6">
+        <AffirmationBlock date={new Date()} />
         <SuggestionsPanel suggestions={suggestions} engine={engine} />
 
         <div className="grid gap-5 lg:grid-cols-3">

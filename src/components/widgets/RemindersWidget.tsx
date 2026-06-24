@@ -20,12 +20,12 @@ export interface ReminderView {
   done: boolean;
 }
 
-function dueLabel(due: string | null): { text: string; tone: "stone" | "amber" | "red" | "green" } {
+function dueLabel(due: string | null): { text: string; tone: "stone" | "gold" | "red" | "green" } {
   if (!due) return { text: "No date", tone: "stone" };
   const days = differenceInCalendarDays(new Date(due), new Date());
   if (days < 0) return { text: `${Math.abs(days)}d overdue`, tone: "red" };
-  if (days === 0) return { text: "Today", tone: "amber" };
-  if (days <= 3) return { text: `In ${days}d`, tone: "amber" };
+  if (days === 0) return { text: "Today", tone: "gold" };
+  if (days <= 3) return { text: `In ${days}d`, tone: "gold" };
   return { text: format(new Date(due), "MMM d"), tone: "stone" };
 }
 
@@ -43,7 +43,7 @@ export default function RemindersWidget({
       title="Reminders"
       icon={<BellRing className="h-4 w-4" />}
       count={reminders.filter((r) => !r.done).length}
-      accent="red"
+      accent="brand"
       action={
         <button
           onClick={() => setShowForm((v) => !v)}
