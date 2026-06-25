@@ -38,6 +38,49 @@ export async function loadKpis(userEmail: string) {
   });
 }
 
+// Programs the sessions tracker covers (one-on-one). Roots is class-style and
+// flagged separately for now.
+export function programOf(service: string | null): "Bridge" | "Roots" | "Launch" | null {
+  const s = (service ?? "").toLowerCase();
+  if (s.includes("roots")) return "Roots";
+  if (s.includes("bridge")) return "Bridge";
+  if (s.includes("launch")) return "Launch";
+  return null;
+}
+
+/** Shaina's recent sessions (last `days`) in the tracked programs. Defensive. */
+export async function loadMyRecentSessions(userEmail: string, days = 21) {
+  try {
+    const now = new Date();
+    const since = new Date(now.getTime() - days * 86400000);
+    const lessons = await prisma.lesson.findMany({
+      where: { userEmail, date: { gte: since, lte: now } },
+      orderBy: { date: "desc" },
+    });
+    return lessons.filter((l) => programOf(l.service) !== null);
+  } catch {
+    return [];
+  }
+}
+
+/** Distinct students Shaina has taught 2+ times (the roster). Defensive. */
+export async function loadMyStudentCount(userEmail: string): Promise<number> {
+  try {
+    const lessons = await prisma.lesson.findMany({
+      where: { userEmail },
+      select: { studentName: true, service: true },
+    });
+    const counts = new Map<string, number>();
+    for (const l of lessons) {
+      if (programOf(l.service) === null) continue;
+      counts.set(l.studentName, (counts.get(l.studentName) ?? 0) + 1);
+    }
+    return [...counts.values()].filter((c) => c >= 2).length;
+  } catch {
+    return 0;
+  }
+}
+
 export interface TodoState {
   status: string;
   snoozeUntil: Date | null;

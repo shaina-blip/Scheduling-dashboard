@@ -19,3 +19,9 @@ export async function getAccessToken(): Promise<string | null> {
   const session = await getServerSession(authOptions);
   return (session as any)?.accessToken ?? null;
 }
+
+/** Returns the signed-in user's display name, or null. */
+export async function getUserName(): Promise<string | null> {
+  const session = await getServerSession(authOptions);
+  return session?.user?.name ?? null;
+}

@@ -79,6 +79,7 @@ export type ParsedLesson = {
   studentName: string;
   service: string | null;
   location: string | null;
+  status: string | null;
 };
 
 /** Heuristically decide what kind of TeachWorks report a CSV is. */
@@ -190,6 +191,7 @@ export function mapLessons(rows: Record<string, string>[]): ParsedLesson[] {
     const title = pick(row, ["Title", "Lesson", "Subject"]);
     const service = pick(row, ["Service", "Program", "Course"]);
     const location = pick(row, ["Location", "Site", "Room"]);
+    const status = pick(row, ["Status", "Attendance", "Lesson Status"]);
     const externalKey = [date ?? "", startTime ?? "", studentName, educator ?? ""].join(
       "|",
     );
@@ -205,6 +207,7 @@ export function mapLessons(rows: Record<string, string>[]): ParsedLesson[] {
       studentName,
       service,
       location,
+      status,
     });
   }
   return out;

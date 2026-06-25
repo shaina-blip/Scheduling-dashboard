@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireUserEmail } from "@/lib/session";
+import { requireUserEmail, getUserName } from "@/lib/session";
 import {
   parseCsv,
   detectKind,
@@ -433,6 +433,49 @@ export async function importTeachworksCsv(
         skipped++;
       }
     }
+  } else if (kind === "lessons") {
+    // Only import lessons Shaina personally taught (educator = her), so subs
+    // for her don't pollute the list — and her own sub coverage is included.
+    const myName = stripAccents((await getUserName()) ?? "");
+    const myFirst = myName.split(" ")[0];
+    for (const l of mapLessons(rows)) {
+      const ed = stripAccents(l.educator ?? "");
+      const edFirst = stripAccents(l.educatorFirst ?? "");
+      const mine =
+        !!myName && (ed.includes(myName) || (!!myFirst && edFirst === myFirst));
+      if (!mine || !l.date) {
+        skipped++;
+        continue;
+      }
+      const data = {
+        date: new Date(l.date),
+        startTime: l.startTime,
+        endTime: l.endTime,
+        title: l.title,
+        educator: l.educator,
+        studentName: l.studentName,
+        service: l.service,
+        location: l.location,
+        status: l.status,
+      };
+      try {
+        const where = {
+          userEmail_externalKey: { userEmail, externalKey: l.externalKey },
+        };
+        const existing = await prisma.lesson.findUnique({ where });
+        if (existing) {
+          await prisma.lesson.update({ where, data });
+          updated++;
+        } else {
+          await prisma.lesson.create({
+            data: { userEmail, externalKey: l.externalKey, ...data },
+          });
+          created++;
+        }
+      } catch {
+        skipped++;
+      }
+    }
   } else {
     return {
       ok: false,
@@ -441,14 +484,14 @@ export async function importTeachworksCsv(
       updated: 0,
       skipped: 0,
       message:
-        "Couldn't tell whether this is a students or schedule export. Pick the type manually and re-upload.",
+        "Couldn't tell what kind of export this is. Pick the type manually and re-upload.",
     };
   }
 
   await prisma.importLog.create({
     data: {
       userEmail,
-      kind: kind === "students" ? "teachworks-students" : "teachworks-schedule",
+      kind: `teachworks-${kind}`,
       fileName: file.name,
       created,
       updated,

@@ -253,3 +253,57 @@ export async function fetchRecentDocs(
     modifiedTime: f.modifiedTime ?? new Date().toISOString(),
   }));
 }
+
+export interface NotesDoc {
+  link: string;
+  modifiedTime: string | null;
+  modifiedByMe: boolean;
+}
+
+/**
+ * Find a student's tutoring-notes doc in the "Students" shared drive. Each
+ * student has a folder "Last, First" containing "First Last Tutoring Notes" —
+ * we match by that doc name across all drives. Returns last-edited time and
+ * whether the signed-in user was the last editor (so we can auto-clear the
+ * reminder once she's updated it). Null if not found.
+ */
+export async function findNotesDoc(
+  accessToken: string,
+  studentName: string,
+): Promise<NotesDoc | null> {
+  const drive = google.drive({ version: "v3", auth: clientFor(accessToken) });
+  const safe = studentName.replace(/'/g, "\\'");
+  const shared = {
+    corpora: "allDrives" as const,
+    includeItemsFromAllDrives: true,
+    supportsAllDrives: true,
+    fields:
+      "files(id,name,modifiedTime,webViewLink,lastModifyingUser(me,emailAddress))",
+    pageSize: 5,
+  };
+
+  // Exact name first, then a looser contains match.
+  const queries = [
+    `name = '${safe} Tutoring Notes' and trashed = false`,
+    `name contains '${safe}' and name contains 'Tutoring Notes' and trashed = false`,
+  ];
+
+  for (const q of queries) {
+    try {
+      const res = await drive.files.list({ q, ...shared });
+      const f = res.data.files?.[0];
+      if (f) {
+        return {
+          link:
+            f.webViewLink ??
+            `https://docs.google.com/document/d/${f.id}/edit`,
+          modifiedTime: f.modifiedTime ?? null,
+          modifiedByMe: f.lastModifyingUser?.me ?? false,
+        };
+      }
+    } catch {
+      // try next query
+    }
+  }
+  return null;
+}

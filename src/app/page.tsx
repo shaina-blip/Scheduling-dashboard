@@ -5,13 +5,16 @@ import {
   fetchActionEmails,
   fetchRecentDocs,
   fetchSchedulingEmails,
+  findNotesDoc,
 } from "@/lib/google";
 import {
   loadIdeas,
   loadReminders,
-  loadStudents,
   loadDismissedEmailIds,
   loadTodoStates,
+  loadMyRecentSessions,
+  loadMyStudentCount,
+  programOf,
   buildSnapshot,
 } from "@/lib/data";
 import { fetchPipelineFamilies } from "@/lib/pipeline";
@@ -23,7 +26,7 @@ import AffirmationBlock from "@/components/AffirmationBlock";
 import SuggestionsPanel from "@/components/widgets/SuggestionsPanel";
 import EmailsWidget from "@/components/widgets/EmailsWidget";
 import ToDoWidget from "@/components/widgets/ToDoWidget";
-import StudentsWidget from "@/components/widgets/StudentsWidget";
+import SessionsWidget from "@/components/widgets/SessionsWidget";
 import IdeasWidget from "@/components/widgets/IdeasWidget";
 import RemindersWidget from "@/components/widgets/RemindersWidget";
 import DocsWidget from "@/components/widgets/DocsWidget";
@@ -91,12 +94,88 @@ export default async function DashboardPage() {
   }
 
   // --- Database-backed data ------------------------------------------------
-  const [ideas, reminders, students, todoStates] = await Promise.all([
-    loadIdeas(userEmail),
-    loadReminders(userEmail),
-    loadStudents(userEmail),
-    loadTodoStates(userEmail),
-  ]);
+  const [ideas, reminders, todoStates, recentSessions, studentCount] =
+    await Promise.all([
+      loadIdeas(userEmail),
+      loadReminders(userEmail),
+      loadTodoStates(userEmail),
+      loadMyRecentSessions(userEmail),
+      loadMyStudentCount(userEmail),
+    ]);
+
+  // --- Sessions tracker: cross-reference each session against the student's
+  // tutoring-notes doc in Drive (auto-clears once she's edited it) ----------
+  const todayDate = new Date();
+  const happened = (l: { date: Date; status: string | null }) =>
+    l.date <= todayDate && !/cancel|miss/i.test(l.status ?? "");
+
+  // One Drive lookup per unique student that needs notes (Bridge/Launch only;
+  // Roots is class-style and handled later).
+  const notesStudents = Array.from(
+    new Set(
+      recentSessions
+        .filter((l) => happened(l) && programOf(l.service) !== "Roots")
+        .map((l) => l.studentName),
+    ),
+  );
+  const notesDocByStudent = new Map<
+    string,
+    Awaited<ReturnType<typeof findNotesDoc>>
+  >();
+  if (accessToken && notesStudents.length) {
+    const results = await Promise.all(
+      notesStudents.map(
+        async (name) =>
+          [name, await findNotesDoc(accessToken, name).catch(() => null)] as const,
+      ),
+    );
+    for (const [name, doc] of results) notesDocByStudent.set(name, doc);
+  }
+
+  const sessionActions = recentSessions
+    .map((l) => {
+      const program = programOf(l.service);
+      const isClass = program === "Roots";
+      const did = happened(l);
+      const needsAttendance =
+        l.date <= todayDate && /scheduled/i.test(l.status ?? "");
+
+      let needsNotes = false;
+      let notesOverdue = false;
+      let notesDocLink: string | null = null;
+      if (did && !isClass) {
+        const doc = notesDocByStudent.get(l.studentName) ?? null;
+        notesDocLink = doc?.link ?? null;
+        const editedSince =
+          !!doc?.modifiedByMe &&
+          !!doc?.modifiedTime &&
+          new Date(doc.modifiedTime) >= l.date;
+        needsNotes = !editedSince;
+        const ageDays =
+          (todayDate.getTime() - l.date.getTime()) / 86400000;
+        notesOverdue = needsNotes && ageDays > 3;
+      }
+
+      return {
+        id: l.id,
+        student: l.studentName,
+        date: l.date.toISOString(),
+        program,
+        isClass,
+        needsNotes,
+        notesOverdue,
+        notesDocLink,
+        needsAttendance,
+      };
+    })
+    .filter((a) => a.needsNotes || a.needsAttendance)
+    // overdue notes first, then attendance, then newest
+    .sort(
+      (a, b) =>
+        Number(b.notesOverdue) - Number(a.notesOverdue) ||
+        Number(b.needsAttendance) - Number(a.needsAttendance) ||
+        new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
 
   // --- Merge pipeline + Gmail into one deduped to-do list, then apply the
   // saved done/ignore/snooze state ----------------------------------------
@@ -160,18 +239,14 @@ export default async function DashboardPage() {
 
           {/* Column 2 — people */}
           <div className="space-y-5">
-            <StudentsWidget
-              students={students.map((s) => ({
-                id: s.id,
-                name: s.name,
-                instructor: s.instructor,
-                status: s.status,
-                instructorNotified: s.instructorNotified,
-                notesComplete: s.notesComplete,
-                collegeLaunch: s.collegeLaunch,
-                collegeLaunchUpdate: s.collegeLaunchUpdate,
-                notesDocUrl: s.notesDocUrl,
-              }))}
+            <SessionsWidget
+              items={sessionActions}
+              studentCount={studentCount}
+              error={
+                !accessToken || authError
+                  ? "Google access expired. Sign out and back in to reconnect."
+                  : null
+              }
             />
             <DocsWidget docs={docs} error={docsError} />
           </div>
