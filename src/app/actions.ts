@@ -259,6 +259,28 @@ export async function dismissEmail(gmailId: string) {
   refresh();
 }
 
+// --- Scheduling to-do (check off / ignore / snooze) ------------------------
+export async function setScheduleTodoState(
+  key: string,
+  status: "open" | "done" | "ignored" | "snoozed",
+  snoozeUntil?: string | null,
+) {
+  const userEmail = await requireUserEmail();
+  const until =
+    status === "snoozed" && snoozeUntil ? new Date(snoozeUntil) : null;
+  try {
+    await prisma.scheduleTodoState.upsert({
+      where: { userEmail_key: { userEmail, key } },
+      update: { status, snoozeUntil: until },
+      create: { userEmail, key, status, snoozeUntil: until },
+    });
+  } catch (err) {
+    // Table may not exist yet (migration pending) — fail soft.
+    console.error("setScheduleTodoState failed", err);
+  }
+  refresh();
+}
+
 // --- TeachWorks CSV import -------------------------------------------------
 export interface ImportResult {
   ok: boolean;

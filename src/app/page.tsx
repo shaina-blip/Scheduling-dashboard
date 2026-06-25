@@ -11,15 +11,18 @@ import {
   loadReminders,
   loadStudents,
   loadDismissedEmailIds,
+  loadTodoStates,
   buildSnapshot,
 } from "@/lib/data";
+import { fetchPipelineFamilies } from "@/lib/pipeline";
+import { mergeScheduling } from "@/lib/scheduling";
 import { getSuggestions } from "@/lib/ai";
 
 import Header from "@/components/Header";
 import AffirmationBlock from "@/components/AffirmationBlock";
 import SuggestionsPanel from "@/components/widgets/SuggestionsPanel";
 import EmailsWidget from "@/components/widgets/EmailsWidget";
-import PendingSchedulingWidget from "@/components/widgets/PendingSchedulingWidget";
+import ToDoWidget from "@/components/widgets/ToDoWidget";
 import StudentsWidget from "@/components/widgets/StudentsWidget";
 import IdeasWidget from "@/components/widgets/IdeasWidget";
 import RemindersWidget from "@/components/widgets/RemindersWidget";
@@ -79,18 +82,40 @@ export default async function DashboardPage() {
         "Couldn't load your scheduling labels from Gmail.";
   }
 
+  // --- New Family Pipeline (Firestore — independent of Google sign-in) ------
+  let families: Awaited<ReturnType<typeof fetchPipelineFamilies>> = [];
+  try {
+    families = await fetchPipelineFamilies();
+  } catch (err) {
+    console.error("pipeline fetch failed", err);
+  }
+
   // --- Database-backed data ------------------------------------------------
-  const [ideas, reminders, students] = await Promise.all([
+  const [ideas, reminders, students, todoStates] = await Promise.all([
     loadIdeas(userEmail),
     loadReminders(userEmail),
     loadStudents(userEmail),
+    loadTodoStates(userEmail),
   ]);
+
+  // --- Merge pipeline + Gmail into one deduped to-do list, then apply the
+  // saved done/ignore/snooze state ----------------------------------------
+  const now = Date.now();
+  const todos = mergeScheduling(families, scheduling).filter((t) => {
+    const st = todoStates.get(t.key);
+    if (!st || st.status === "open") return true;
+    if (st.status === "done" || st.status === "ignored") return false;
+    if (st.status === "snoozed") {
+      return st.snoozeUntil ? st.snoozeUntil.getTime() <= now : true;
+    }
+    return true;
+  });
 
   // --- Suggestion engine ---------------------------------------------------
   const snapshot = await buildSnapshot(
     userEmail,
     emails.map((e) => ({ from: e.from, fromName: e.fromName, date: e.date })),
-    scheduling.length,
+    todos.length,
   );
   const { suggestions, engine } = await getSuggestions(snapshot);
 
@@ -121,15 +146,16 @@ export default async function DashboardPage() {
               }))}
               error={emailError}
             />
-            <PendingSchedulingWidget
-              items={scheduling.map((e) => ({
-                id: e.id,
-                fromName: e.fromName,
-                subject: e.subject,
-                date: e.date,
-                starred: e.starred,
-                threadCount: e.threadCount,
-                link: e.link,
+            <ToDoWidget
+              items={todos.map((t) => ({
+                key: t.key,
+                title: t.title,
+                subtitle: t.subtitle,
+                sources: t.sources,
+                starred: t.starred,
+                stageName: t.stageName,
+                emailLink: t.emailLink,
+                pipelineLink: t.pipelineLink,
               }))}
               error={schedulingError}
             />
