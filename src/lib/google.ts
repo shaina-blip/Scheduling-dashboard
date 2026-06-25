@@ -18,7 +18,36 @@ export interface EmailItem {
   starred: boolean;
   important: boolean;
   threadCount: number; // how many messages of this thread are in the result set
+  body?: string; // plain-text body (only fetched when withBody is requested)
   link: string;
+}
+
+function decodeB64Url(data: string): string {
+  try {
+    return Buffer.from(
+      data.replace(/-/g, "+").replace(/_/g, "/"),
+      "base64",
+    ).toString("utf8");
+  } catch {
+    return "";
+  }
+}
+
+/** Recursively pull plain-text (or stripped HTML) from a Gmail message payload. */
+function extractBody(payload: any): string {
+  if (!payload) return "";
+  const mime = payload.mimeType ?? "";
+  if (mime.startsWith("text/plain") && payload.body?.data)
+    return decodeB64Url(payload.body.data);
+  if (payload.parts) {
+    for (const p of payload.parts) {
+      const t = extractBody(p);
+      if (t) return t;
+    }
+  }
+  if (mime.startsWith("text/html") && payload.body?.data)
+    return decodeB64Url(payload.body.data).replace(/<[^>]+>/g, " ");
+  return "";
 }
 
 function header(headers: any[] | undefined, name: string): string {
@@ -53,11 +82,13 @@ export const LABELS = {
   collegeLaunch: "College Launch",
 };
 
-/** Run a Gmail search and return mapped results, starred-first then newest. */
+/** Run a Gmail search and return mapped results, starred-first then newest.
+ * Pass withBody to fetch full message bodies (used to find the student name). */
 async function listEmails(
   gmail: any,
   q: string,
   max: number,
+  withBody = false,
 ): Promise<EmailItem[]> {
   const list = await gmail.users.messages.list({
     userId: "me",
@@ -74,8 +105,10 @@ async function listEmails(
       gmail.users.messages.get({
         userId: "me",
         id,
-        format: "metadata",
-        metadataHeaders: ["From", "Subject", "Date"],
+        format: withBody ? "full" : "metadata",
+        ...(withBody
+          ? {}
+          : { metadataHeaders: ["From", "Subject", "Date"] }),
       }),
     ),
   );
@@ -101,6 +134,7 @@ async function listEmails(
       starred: labelIds.includes("STARRED"),
       important: labelIds.includes("IMPORTANT"),
       threadCount: 1,
+      body: withBody ? extractBody(m.payload).slice(0, 4000) : undefined,
       link: `https://mail.google.com/mail/u/0/#inbox/${m.threadId}`,
     };
   });
@@ -125,6 +159,7 @@ async function listEmails(
       ex.snippet = it.snippet;
       ex.from = it.from;
       ex.fromName = it.fromName;
+      ex.body = it.body;
       ex.link = it.link;
     }
   }
@@ -150,7 +185,7 @@ export async function fetchSchedulingEmails(
     .map((l) => `label:"${l}"`)
     .join(" OR ");
   const q = `(${labelClause}) -label:"${LABELS.done}"`;
-  return listEmails(gmail, q, max);
+  return listEmails(gmail, q, max, true);
 }
 
 /**

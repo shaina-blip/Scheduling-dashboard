@@ -61,15 +61,33 @@ function studentFromEmail(
   e: EmailItem,
   families: FamilyItem[],
 ): string | null {
+  // 1) Most reliable: the sender's email matches a family.
   const from = emailAddr(e.from);
   if (from) {
     const byEmail = families.find((f) => emailAddr(f.email) === from);
     if (byEmail?.studentName) return byEmail.studentName;
   }
-  const hay = norm(`${e.subject} ${e.snippet}`);
+
+  const text = `${e.subject} ${e.snippet} ${e.body ?? ""}`;
+  const hay = norm(text);
+
+  // 2) A known student's full name appears anywhere in the email.
   for (const f of families) {
     const n = norm(f.studentName);
-    if (n.length >= 4 && n.includes(" ") && hay.includes(n)) return f.studentName;
+    if (n.length >= 4 && n.includes(" ") && hay.includes(n))
+      return f.studentName;
+  }
+
+  // 3) Heuristic phrasing, e.g. "my son Jovan", "for my daughter Mia",
+  //    "regarding Jovan Montijo", "Jovan's sessions".
+  const patterns = [
+    /\b(?:my|our)\s+(?:son|daughter|child|kid|student)\s+(?:is\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/,
+    /\b(?:for|regarding|about|re:)\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/,
+    /\b([A-Z][a-z]+\s+[A-Z][a-z]+)(?:'s|’s)\b/,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (m?.[1]) return m[1].trim();
   }
   return null;
 }
