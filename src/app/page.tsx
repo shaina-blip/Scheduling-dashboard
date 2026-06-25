@@ -7,6 +7,7 @@ import {
   fetchRecentDocs,
   fetchSchedulingEmails,
   findNotesDoc,
+  getNotesDocById,
 } from "@/lib/google";
 import {
   loadIdeas,
@@ -15,9 +16,11 @@ import {
   loadTodoStates,
   loadMyRecentSessions,
   loadMyStudentCount,
+  loadNotesDocLinks,
   programOf,
   buildSnapshot,
 } from "@/lib/data";
+import { sessionEndUtc } from "@/lib/time";
 import { fetchPipelineFamilies } from "@/lib/pipeline";
 import { mergeScheduling } from "@/lib/scheduling";
 import { getSuggestions } from "@/lib/ai";
@@ -95,14 +98,21 @@ export default async function DashboardPage() {
   }
 
   // --- Database-backed data ------------------------------------------------
-  const [ideas, reminders, todoStates, recentSessions, studentCount] =
-    await Promise.all([
-      loadIdeas(userEmail),
-      loadReminders(userEmail),
-      loadTodoStates(userEmail),
-      loadMyRecentSessions(userEmail),
-      loadMyStudentCount(userEmail),
-    ]);
+  const [
+    ideas,
+    reminders,
+    todoStates,
+    recentSessions,
+    studentCount,
+    notesLinks,
+  ] = await Promise.all([
+    loadIdeas(userEmail),
+    loadReminders(userEmail),
+    loadTodoStates(userEmail),
+    loadMyRecentSessions(userEmail),
+    loadMyStudentCount(userEmail),
+    loadNotesDocLinks(userEmail),
+  ]);
 
   // --- Sessions tracker: cross-reference each session against the student's
   // tutoring-notes doc in Drive (auto-clears once she's edited it) ----------
@@ -128,13 +138,16 @@ export default async function DashboardPage() {
   >();
   if (accessToken && notesStudents.length) {
     const results = await Promise.all(
-      notesStudents.map(
-        async (name) =>
-          [
-            name,
-            await findNotesDoc(accessToken, name, userEmail).catch(() => null),
-          ] as const,
-      ),
+      notesStudents.map(async (name) => {
+        // Prefer a manually-connected doc; otherwise auto-find by name.
+        const linked = notesLinks.get(name);
+        const doc = linked
+          ? await getNotesDocById(accessToken, linked.docId, userEmail).catch(
+              () => null,
+            )
+          : await findNotesDoc(accessToken, name, userEmail).catch(() => null);
+        return [name, doc] as const;
+      }),
     );
     for (const [name, doc] of results) notesDocByStudent.set(name, doc);
   }
@@ -152,10 +165,13 @@ export default async function DashboardPage() {
       if (did && !isClass) {
         const doc = notesDocByStudent.get(l.studentName) ?? null;
         notesDocLink = doc?.link ?? null;
+        // Done only if she edited the doc AFTER the session ended (so opening it
+        // beforehand to prep doesn't count).
         const editedSince =
           !!doc?.modifiedByMe &&
           !!doc?.modifiedTime &&
-          differenceInCalendarDays(new Date(doc.modifiedTime), l.date) >= 0;
+          new Date(doc.modifiedTime) >=
+            sessionEndUtc(l.date, l.endTime, l.startTime);
         needsNotes = !editedSince;
         notesOverdue =
           needsNotes && differenceInCalendarDays(todayDate, l.date) > 3;
