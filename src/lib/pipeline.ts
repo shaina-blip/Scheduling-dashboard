@@ -31,12 +31,6 @@ const STAGE_NAMES: Record<number, string> = {
   8: "Active",
 };
 
-const CLOSED = new Set(["Not moving forward", "Gone Rogue"]);
-
-// Stages that count as "needs scheduling attention": survey complete through
-// schedule confirmed. Before that it's not ready; after, scheduling is settled.
-const PENDING_STAGES = new Set([3, 4, 5]);
-
 function fv(field: any): any {
   if (!field) return null;
   if ("stringValue" in field) return field.stringValue;
@@ -89,10 +83,7 @@ export async function fetchPipelineFamilies(
     };
   });
 
-  return families.filter(
-    (f) =>
-      PENDING_STAGES.has(f.stage) &&
-      !CLOSED.has(f.decisionStatus ?? "") &&
-      (f.studentName || f.parentName),
-  );
+  // Return ALL families: scheduling-stage ones become to-do rows, and the full
+  // set serves as a name dictionary to label Gmail-only items by student.
+  return families.filter((f) => f.studentName || f.parentName);
 }

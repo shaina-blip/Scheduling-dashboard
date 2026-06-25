@@ -146,18 +146,15 @@ export default async function DashboardPage() {
               }))}
               error={emailError}
             />
-            <ToDoWidget
-              items={todos.map((t) => ({
-                key: t.key,
-                title: t.title,
-                subtitle: t.subtitle,
-                sources: t.sources,
-                starred: t.starred,
-                stageName: t.stageName,
-                emailLink: t.emailLink,
-                pipelineLink: t.pipelineLink,
+            <RemindersWidget
+              reminders={reminders.map((r) => ({
+                id: r.id,
+                title: r.title,
+                category: r.category,
+                dueDate: r.dueDate ? r.dueDate.toISOString() : null,
+                recurrence: r.recurrence,
+                done: r.done,
               }))}
-              error={schedulingError}
             />
           </div>
 
@@ -179,8 +176,22 @@ export default async function DashboardPage() {
             <DocsWidget docs={docs} error={docsError} />
           </div>
 
-          {/* Column 3 — my head: ideas + reminders */}
+          {/* Column 3 — my work: to-do + ideas */}
           <div className="space-y-5">
+            <ToDoWidget
+              items={todos.map((t) => ({
+                key: t.key,
+                title: t.title,
+                student: t.student,
+                subtitle: t.subtitle,
+                sources: t.sources,
+                starred: t.starred,
+                stageName: t.stageName,
+                emailLink: t.emailLink,
+                pipelineLink: t.pipelineLink,
+              }))}
+              error={schedulingError}
+            />
             <IdeasWidget
               ideas={ideas.map((i) => ({
                 id: i.id,
@@ -189,16 +200,6 @@ export default async function DashboardPage() {
                 kind: i.kind,
                 status: i.status,
                 priority: i.priority,
-              }))}
-            />
-            <RemindersWidget
-              reminders={reminders.map((r) => ({
-                id: r.id,
-                title: r.title,
-                category: r.category,
-                dueDate: r.dueDate ? r.dueDate.toISOString() : null,
-                recurrence: r.recurrence,
-                done: r.done,
               }))}
             />
           </div>
