@@ -117,6 +117,29 @@ model ScheduleItem {
   @@index([userEmail, status, startsAt])
 }
 
+// --- Lessons (Shaina's own sessions, from TeachWorks Lesson Summary) --------
+// Used to track whether she's marked each session attended + uploaded notes.
+model Lesson {
+  id             String   @id @default(cuid())
+  userEmail      String
+  externalKey    String   // date|start|student|educator — for re-import dedupe
+  date           DateTime
+  startTime      String?
+  endTime        String?
+  title          String?
+  educator       String?
+  studentName    String
+  service        String?
+  location       String?
+  attendedLogged Boolean  @default(false)
+  notesLogged    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userEmail, externalKey])
+  @@index([userEmail, date])
+}
+
 // --- KPIs ------------------------------------------------------------------
 model Kpi {
   id          String   @id @default(cuid())
@@ -141,6 +164,22 @@ model DismissedEmail {
   createdAt   DateTime @default(now())
 
   @@unique([userEmail, gmailId])
+}
+
+// --- Scheduling to-do state (check off / ignore / snooze per family) --------
+// Families come live from the pipeline + Gmail; this stores Shaina's action on
+// each one. Keyed by a stable id ("fam:<docId>" or "thread:<threadId>").
+model ScheduleTodoState {
+  id          String    @id @default(cuid())
+  userEmail   String
+  key         String
+  status      String    @default("open") // open | done | ignored | snoozed
+  snoozeUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime  @default(now())
+
+  @@unique([userEmail, key])
+  @@index([userEmail])
 }
 
 // --- Import audit log ------------------------------------------------------

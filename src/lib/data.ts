@@ -38,6 +38,28 @@ export async function loadKpis(userEmail: string) {
   });
 }
 
+export interface TodoState {
+  status: string;
+  snoozeUntil: Date | null;
+}
+
+/** Map of scheduling to-do key -> saved state. Defensive if table is missing. */
+export async function loadTodoStates(
+  userEmail: string,
+): Promise<Map<string, TodoState>> {
+  try {
+    const rows = await prisma.scheduleTodoState.findMany({
+      where: { userEmail },
+      select: { key: true, status: true, snoozeUntil: true },
+    });
+    return new Map(
+      rows.map((r) => [r.key, { status: r.status, snoozeUntil: r.snoozeUntil }]),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
 export async function loadDismissedEmailIds(userEmail: string) {
   const rows = await prisma.dismissedEmail.findMany({
     where: { userEmail },

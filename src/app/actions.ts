@@ -8,8 +8,13 @@ import {
   detectKind,
   mapStudents,
   mapSchedule,
+  mapLessons,
   type DetectedKind,
 } from "@/lib/teachworks";
+
+function stripAccents(s: string): string {
+  return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+}
 
 function str(form: FormData, key: string): string | null {
   const v = form.get(key);
@@ -178,6 +183,21 @@ export async function deleteStudent(id: string) {
   refresh();
 }
 
+// --- Lessons (my sessions to log) -----------------------------------------
+export async function toggleLessonFlag(
+  id: string,
+  field: "attendedLogged" | "notesLogged",
+) {
+  const userEmail = await requireUserEmail();
+  const l = await prisma.lesson.findFirst({ where: { id, userEmail } });
+  if (!l) return;
+  await prisma.lesson.update({
+    where: { id },
+    data: { [field]: !l[field] },
+  });
+  refresh();
+}
+
 // --- Schedule --------------------------------------------------------------
 export async function updateScheduleStatus(id: string, status: string) {
   const userEmail = await requireUserEmail();
@@ -239,6 +259,28 @@ export async function dismissEmail(gmailId: string) {
   refresh();
 }
 
+// --- Scheduling to-do (check off / ignore / snooze) ------------------------
+export async function setScheduleTodoState(
+  key: string,
+  status: "open" | "done" | "ignored" | "snoozed",
+  snoozeUntil?: string | null,
+) {
+  const userEmail = await requireUserEmail();
+  const until =
+    status === "snoozed" && snoozeUntil ? new Date(snoozeUntil) : null;
+  try {
+    await prisma.scheduleTodoState.upsert({
+      where: { userEmail_key: { userEmail, key } },
+      update: { status, snoozeUntil: until },
+      create: { userEmail, key, status, snoozeUntil: until },
+    });
+  } catch (err) {
+    // Table may not exist yet (migration pending) — fail soft.
+    console.error("setScheduleTodoState failed", err);
+  }
+  refresh();
+}
+
 // --- TeachWorks CSV import -------------------------------------------------
 export interface ImportResult {
   ok: boolean;
@@ -281,7 +323,7 @@ export async function importTeachworksCsv(
   }
 
   const kind: DetectedKind =
-    override === "students" || override === "schedule"
+    override === "students" || override === "schedule" || override === "lessons"
       ? (override as DetectedKind)
       : detectKind(headers);
 
