@@ -15,6 +15,7 @@ import { setScheduleTodoState } from "@/app/actions";
 export interface TodoView {
   key: string;
   title: string;
+  student: string | null;
   subtitle: string;
   sources: ("pipeline" | "gmail")[];
   starred: boolean;
@@ -75,6 +76,11 @@ export default function ToDoWidget({
                       <Mail className="h-3 w-3 text-stone-400" />
                     )}
                   </div>
+                  {it.student && (
+                    <p className="truncate text-xs font-medium text-wild-plum">
+                      👤 {it.student}
+                    </p>
+                  )}
                   {it.subtitle && (
                     <p className="truncate text-xs text-stone-500">
                       {it.subtitle}
