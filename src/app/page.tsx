@@ -116,6 +116,7 @@ export default async function DashboardPage() {
                 date: e.date,
                 starred: e.starred,
                 important: e.important,
+                threadCount: e.threadCount,
                 link: e.link,
               }))}
               error={emailError}
@@ -127,6 +128,7 @@ export default async function DashboardPage() {
                 subject: e.subject,
                 date: e.date,
                 starred: e.starred,
+                threadCount: e.threadCount,
                 link: e.link,
               }))}
               error={schedulingError}

@@ -17,6 +17,7 @@ export interface EmailItem {
   unread: boolean;
   starred: boolean;
   important: boolean;
+  threadCount: number; // how many messages of this thread are in the result set
   link: string;
 }
 
@@ -99,16 +100,41 @@ async function listEmails(
       unread: labelIds.includes("UNREAD"),
       starred: labelIds.includes("STARRED"),
       important: labelIds.includes("IMPORTANT"),
+      threadCount: 1,
       link: `https://mail.google.com/mail/u/0/#inbox/${m.threadId}`,
     };
   });
 
-  items.sort(
+  // Collapse to one entry per thread so a back-and-forth conversation shows as
+  // a single item (and families aren't double-counted). Keep the most recent
+  // message as the representative; carry starred/unread if any message has it.
+  const byThread = new Map<string, EmailItem>();
+  for (const it of items) {
+    const ex = byThread.get(it.threadId);
+    if (!ex) {
+      byThread.set(it.threadId, it);
+      continue;
+    }
+    ex.threadCount += 1;
+    ex.starred = ex.starred || it.starred;
+    ex.unread = ex.unread || it.unread;
+    if (new Date(it.date) > new Date(ex.date)) {
+      ex.id = it.id;
+      ex.date = it.date;
+      ex.subject = it.subject;
+      ex.snippet = it.snippet;
+      ex.from = it.from;
+      ex.fromName = it.fromName;
+      ex.link = it.link;
+    }
+  }
+
+  // Starred ("I need to act on this") first, then most recent.
+  return [...byThread.values()].sort(
     (a, b) =>
       Number(b.starred) - Number(a.starred) ||
       new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
-  return items;
 }
 
 /**
