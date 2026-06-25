@@ -66,13 +66,32 @@ function parseDate(value: string | null): string | null {
   return null;
 }
 
-export type DetectedKind = "students" | "schedule" | "unknown";
+export type DetectedKind = "students" | "schedule" | "lessons" | "unknown";
+
+export type ParsedLesson = {
+  externalKey: string;
+  date: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  title: string | null;
+  educator: string | null;
+  educatorFirst: string | null;
+  studentName: string;
+  service: string | null;
+  location: string | null;
+};
 
 /** Heuristically decide what kind of TeachWorks report a CSV is. */
 export function detectKind(headers: string[]): DetectedKind {
   const h = headers.map(norm);
   const has = (...names: string[]) =>
     names.some((n) => h.some((x) => x.includes(norm(n))));
+
+  // Lesson Summary export: has Educator + Student name columns.
+  const lessonSignals =
+    has("educatorfirstname", "educatorlastname") ||
+    (has("educator") && has("studentfirstname"));
+  if (lessonSignals) return "lessons";
 
   const scheduleSignals = has(
     "starttime",
@@ -141,6 +160,51 @@ export function mapStudents(rows: Record<string, string>[]): ParsedStudent[] {
         pick(row, ["Start Date", "Join Date", "Enrolled", "Created"]),
       ),
       status,
+    });
+  }
+  return out;
+}
+
+export function mapLessons(rows: Record<string, string>[]): ParsedLesson[] {
+  const out: ParsedLesson[] = [];
+  for (const row of rows) {
+    const ef = pick(row, [
+      "Educator First Name",
+      "Educator First",
+      "Instructor First Name",
+    ]);
+    const el = pick(row, [
+      "Educator Last Name",
+      "Educator Last",
+      "Instructor Last Name",
+    ]);
+    const sf = pick(row, ["Student First Name", "Student First"]);
+    const sl = pick(row, ["Student Last Name", "Student Last"]);
+    const studentName = [sf, sl].filter(Boolean).join(" ").trim();
+    if (!studentName) continue;
+
+    const educator = [ef, el].filter(Boolean).join(" ").trim() || null;
+    const date = parseDate(pick(row, ["Date", "Lesson Date"]));
+    const startTime = pick(row, ["Start Time", "Start"]);
+    const endTime = pick(row, ["End Time", "End"]);
+    const title = pick(row, ["Title", "Lesson", "Subject"]);
+    const service = pick(row, ["Service", "Program", "Course"]);
+    const location = pick(row, ["Location", "Site", "Room"]);
+    const externalKey = [date ?? "", startTime ?? "", studentName, educator ?? ""].join(
+      "|",
+    );
+
+    out.push({
+      externalKey,
+      date,
+      startTime,
+      endTime,
+      title,
+      educator,
+      educatorFirst: ef,
+      studentName,
+      service,
+      location,
     });
   }
   return out;
