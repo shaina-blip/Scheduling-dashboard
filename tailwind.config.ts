@@ -8,18 +8,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Shaina's signature — angelic rose (the hero of the palette)
+        // Shaina's signature — soft "baby girl" pink (the hero of the palette)
         brand: {
-          50: "#fdf6f7",
-          100: "#fbe9ed",
-          200: "#f6d4dc",
-          300: "#eeb4c1",
-          400: "#e293a4",
-          500: "#d4738a",
-          600: "#bd5c77",
-          700: "#9d4a62",
-          800: "#824053",
-          900: "#6e3848",
+          50: "#fff5fb",
+          100: "#ffe7f6",
+          200: "#ffcfec",
+          300: "#fbb3e0",
+          400: "#f590cf",
+          500: "#ec6fbb",
+          600: "#d94fa1",
+          700: "#b23d83",
+          800: "#8d3167",
+          900: "#6e2651",
         },
         // Wildewood brand accents (lightened green per the brand sheet)
         wild: {

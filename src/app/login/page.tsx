@@ -1,7 +1,6 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { GraduationCap } from "lucide-react";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -12,11 +11,14 @@ function LoginInner() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-700 to-brand-900 p-6">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-8 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-100">
-          <GraduationCap className="h-7 w-7 text-brand-700" />
-        </div>
-        <h1 className="font-display text-3xl tracking-wide text-stone-800">
-          Wildewood
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo.png"
+          alt="Wildewood Education"
+          className="mx-auto mb-4 h-14 w-auto"
+        />
+        <h1 className="font-display text-xl tracking-wide text-stone-800">
+          COO Dashboard
         </h1>
         <p className="mt-2 text-sm text-stone-500">
           Your morning command center — emails, schedules, students, ideas,
