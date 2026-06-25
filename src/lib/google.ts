@@ -270,6 +270,7 @@ export interface NotesDoc {
 export async function findNotesDoc(
   accessToken: string,
   studentName: string,
+  signedInEmail?: string | null,
 ): Promise<NotesDoc | null> {
   const drive = google.drive({ version: "v3", auth: clientFor(accessToken) });
   const safe = studentName.replace(/'/g, "\\'");
@@ -281,6 +282,7 @@ export async function findNotesDoc(
       "files(id,name,modifiedTime,webViewLink,lastModifyingUser(me,emailAddress))",
     pageSize: 5,
   };
+  const myEmail = (signedInEmail ?? "").toLowerCase();
 
   // Exact name first, then a looser contains match.
   const queries = [
@@ -293,16 +295,21 @@ export async function findNotesDoc(
       const res = await drive.files.list({ q, ...shared });
       const f = res.data.files?.[0];
       if (f) {
+        const editor = f.lastModifyingUser;
+        const modifiedByMe =
+          editor?.me === true ||
+          (!!myEmail &&
+            (editor?.emailAddress ?? "").toLowerCase() === myEmail);
         return {
           link:
             f.webViewLink ??
             `https://docs.google.com/document/d/${f.id}/edit`,
           modifiedTime: f.modifiedTime ?? null,
-          modifiedByMe: f.lastModifyingUser?.me ?? false,
+          modifiedByMe,
         };
       }
-    } catch {
-      // try next query
+    } catch (err) {
+      console.error("findNotesDoc query failed", studentName, err);
     }
   }
   return null;

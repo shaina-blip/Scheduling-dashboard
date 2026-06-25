@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
+import { differenceInCalendarDays } from "date-fns";
 import { authOptions } from "@/lib/auth";
 import {
   fetchActionEmails,
@@ -106,18 +107,21 @@ export default async function DashboardPage() {
   // --- Sessions tracker: cross-reference each session against the student's
   // tutoring-notes doc in Drive (auto-clears once she's edited it) ----------
   const todayDate = new Date();
+  // Compare by calendar day to avoid timezone off-by-one between the imported
+  // session date (midnight) and Drive's timestamped edits.
   const happened = (l: { date: Date; status: string | null }) =>
-    l.date <= todayDate && !/cancel|miss/i.test(l.status ?? "");
+    differenceInCalendarDays(todayDate, l.date) >= 0 &&
+    !/cancel|miss/i.test(l.status ?? "");
 
   // One Drive lookup per unique student that needs notes (Bridge/Launch only;
-  // Roots is class-style and handled later).
+  // Roots is class-style and handled later). Capped to keep page loads sane.
   const notesStudents = Array.from(
     new Set(
       recentSessions
         .filter((l) => happened(l) && programOf(l.service) !== "Roots")
         .map((l) => l.studentName),
     ),
-  );
+  ).slice(0, 60);
   const notesDocByStudent = new Map<
     string,
     Awaited<ReturnType<typeof findNotesDoc>>
@@ -126,7 +130,10 @@ export default async function DashboardPage() {
     const results = await Promise.all(
       notesStudents.map(
         async (name) =>
-          [name, await findNotesDoc(accessToken, name).catch(() => null)] as const,
+          [
+            name,
+            await findNotesDoc(accessToken, name, userEmail).catch(() => null),
+          ] as const,
       ),
     );
     for (const [name, doc] of results) notesDocByStudent.set(name, doc);
@@ -137,8 +144,7 @@ export default async function DashboardPage() {
       const program = programOf(l.service);
       const isClass = program === "Roots";
       const did = happened(l);
-      const needsAttendance =
-        l.date <= todayDate && /scheduled/i.test(l.status ?? "");
+      const needsAttendance = did && /scheduled/i.test(l.status ?? "");
 
       let needsNotes = false;
       let notesOverdue = false;
@@ -149,11 +155,10 @@ export default async function DashboardPage() {
         const editedSince =
           !!doc?.modifiedByMe &&
           !!doc?.modifiedTime &&
-          new Date(doc.modifiedTime) >= l.date;
+          differenceInCalendarDays(new Date(doc.modifiedTime), l.date) >= 0;
         needsNotes = !editedSince;
-        const ageDays =
-          (todayDate.getTime() - l.date.getTime()) / 86400000;
-        notesOverdue = needsNotes && ageDays > 3;
+        notesOverdue =
+          needsNotes && differenceInCalendarDays(todayDate, l.date) > 3;
       }
 
       return {

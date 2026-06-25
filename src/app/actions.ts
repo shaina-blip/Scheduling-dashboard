@@ -437,12 +437,19 @@ export async function importTeachworksCsv(
     // Only import lessons Shaina personally taught (educator = her), so subs
     // for her don't pollute the list — and her own sub coverage is included.
     const myName = stripAccents((await getUserName()) ?? "");
-    const myFirst = myName.split(" ")[0];
+    const parts = myName.split(" ").filter(Boolean);
+    const myFirst = parts[0] ?? "";
+    const myLast = parts.slice(1).join(" ");
     for (const l of mapLessons(rows)) {
-      const ed = stripAccents(l.educator ?? "");
+      const fullEd = stripAccents(l.educator ?? "");
       const edFirst = stripAccents(l.educatorFirst ?? "");
+      const edLast = stripAccents(l.educatorLast ?? "");
+      // Match Shaina by full name, or first+last (falls back to first-name-only
+      // if her account has no last name).
       const mine =
-        !!myName && (ed.includes(myName) || (!!myFirst && edFirst === myFirst));
+        !!myFirst &&
+        (fullEd === myName ||
+          (edFirst === myFirst && (!myLast || edLast === myLast)));
       if (!mine || !l.date) {
         skipped++;
         continue;
