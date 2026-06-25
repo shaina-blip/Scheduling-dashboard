@@ -14,6 +14,7 @@ export interface EmailView {
   date: string;
   starred: boolean;
   important: boolean;
+  threadCount: number;
   link: string;
 }
 
@@ -61,6 +62,11 @@ export default function EmailsWidget({
                   </span>
                   {e.starred && (
                     <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                  )}
+                  {e.threadCount > 1 && (
+                    <span className="rounded-full bg-stone-100 px-1.5 text-[10px] font-medium text-stone-500">
+                      {e.threadCount}
+                    </span>
                   )}
                   <span className="ml-auto shrink-0 text-[11px] text-stone-400">
                     {formatDistanceToNow(new Date(e.date), { addSuffix: true })}

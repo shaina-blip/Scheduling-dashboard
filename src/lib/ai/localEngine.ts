@@ -96,7 +96,7 @@ export function generateLocalSuggestions(s: DashboardSnapshot): Suggestion[] {
   // --- Pending scheduling (from Gmail labels) ------------------------------
   if (s.schedule.pending > 0) {
     add({
-      title: `${plural(s.schedule.pending, "family")} waiting on scheduling`,
+      title: `${plural(s.schedule.pending, "family", "families")} waiting on scheduling`,
       detail:
         "These are sitting in your scheduling labels. Once a family is confirmed, notify the instructor and Tara, then label the thread DONE! to clear it.",
       severity: s.schedule.pending >= 5 ? "urgent" : "attention",

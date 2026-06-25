@@ -8,6 +8,7 @@ export interface SchedulingView {
   subject: string;
   date: string;
   starred: boolean;
+  threadCount: number;
   link: string;
 }
 
@@ -50,6 +51,11 @@ export default function PendingSchedulingWidget({
                       </span>
                       {it.starred && (
                         <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      )}
+                      {it.threadCount > 1 && (
+                        <span className="rounded-full bg-stone-100 px-1.5 text-[10px] font-medium text-stone-500">
+                          {it.threadCount}
+                        </span>
                       )}
                       <span className="ml-auto shrink-0 text-[11px] text-stone-400">
                         {formatDistanceToNow(new Date(it.date), {
