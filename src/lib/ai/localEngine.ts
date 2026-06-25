@@ -102,7 +102,7 @@ export function generateLocalSuggestions(s: DashboardSnapshot): Suggestion[] {
       severity: s.schedule.pending >= 5 ? "urgent" : "attention",
       category: "Schedule",
       actionLabel: "Review scheduling",
-      actionHref: "/#schedule",
+      actionHref: "/#todo",
       score: 75 + Math.min(s.schedule.pending, 12) * 4,
     });
   }

@@ -54,6 +54,31 @@ function emailMatchesFamily(e: EmailItem, fam: FamilyItem): boolean {
   return names.some((n) => hay.includes(n));
 }
 
+/** A concise one-line gist of a scheduling email: first real sentence of the
+ * body with quoted replies / signatures / headers stripped, else the subject.
+ * (Extractive — when an ANTHROPIC_API_KEY is configured this can be swapped for
+ * a Claude-written summary via the AI seam.) */
+function summarizeEmail(e: EmailItem): string {
+  const raw = (e.body && e.body.trim() ? e.body : e.snippet) ?? "";
+  const clean: string[] = [];
+  for (const ln of raw.split(/\r?\n/)) {
+    const t = ln.trim();
+    if (!t) continue;
+    if (t.startsWith(">")) continue;
+    if (/^On .+wrote:?$/i.test(t)) break;
+    if (/^(from|sent|to|subject|cc):/i.test(t)) break;
+    if (/^--\s*$/.test(t)) break;
+    if (/unsubscribe|sent from my/i.test(t)) continue;
+    clean.push(t);
+    if (clean.join(" ").length > 220) break;
+  }
+  let text = clean.join(" ").replace(/\s+/g, " ").trim();
+  if (!text) text = (e.subject ?? "").replace(/^(re|fwd):\s*/i, "").trim();
+  const first = text.split(/(?<=[.!?])\s/)[0] ?? text;
+  const out = first.length > 140 ? first.slice(0, 137) + "…" : first;
+  return out || e.subject || "(no preview)";
+}
+
 /** Best-guess the student an email is about, using the family list as a name
  * dictionary: match the sender's email first, else scan subject + preview for a
  * known full student name. */
@@ -141,7 +166,7 @@ export function mergeScheduling(
       key: `thread:${e.threadId}`,
       title: e.fromName,
       student: studentFromEmail(e, families),
-      subtitle: e.subject,
+      subtitle: summarizeEmail(e),
       sources: ["gmail"],
       date: e.date,
       starred: e.starred,
