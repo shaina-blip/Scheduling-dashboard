@@ -1,7 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { GraduationCap, LogOut, Upload } from "lucide-react";
+import { LogOut, Upload } from "lucide-react";
 import Link from "next/link";
 
 export default function Header({
@@ -15,15 +15,16 @@ export default function Header({
     <header className="sticky top-0 z-20 border-b border-stone-200 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-100 to-wild-green/20">
-            <GraduationCap className="h-5 w-5 text-brand-600" />
-          </div>
-          <div>
-            <p className="font-display text-lg leading-tight tracking-wide text-stone-900">
-              Wildewood
-            </p>
-            <p className="text-xs text-stone-500">{greeting}, {name}.</p>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.png"
+            alt="Wildewood Education"
+            className="h-9 w-auto"
+          />
+          <span className="hidden h-7 w-px bg-stone-200 sm:block" />
+          <p className="hidden text-xs text-stone-500 sm:block">
+            {greeting}, {name}.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Link
