@@ -131,6 +131,7 @@ model Lesson {
   studentName    String
   service        String?
   location       String?
+  status         String?  // from TeachWorks: Attended | Scheduled | Cancelled | Missed
   attendedLogged Boolean  @default(false)
   notesLogged    Boolean  @default(false)
   createdAt      DateTime @default(now())

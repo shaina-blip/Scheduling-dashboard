@@ -76,9 +76,11 @@ export type ParsedLesson = {
   title: string | null;
   educator: string | null;
   educatorFirst: string | null;
+  educatorLast: string | null;
   studentName: string;
   service: string | null;
   location: string | null;
+  status: string | null;
 };
 
 /** Heuristically decide what kind of TeachWorks report a CSV is. */
@@ -90,7 +92,8 @@ export function detectKind(headers: string[]): DetectedKind {
   // Lesson Summary export: has Educator + Student name columns.
   const lessonSignals =
     has("educatorfirstname", "educatorlastname") ||
-    (has("educator") && has("studentfirstname"));
+    (has("educator") && has("studentfirstname")) ||
+    (has("educator") && has("student") && has("status"));
   if (lessonSignals) return "lessons";
 
   const scheduleSignals = has(
@@ -190,9 +193,14 @@ export function mapLessons(rows: Record<string, string>[]): ParsedLesson[] {
     const title = pick(row, ["Title", "Lesson", "Subject"]);
     const service = pick(row, ["Service", "Program", "Course"]);
     const location = pick(row, ["Location", "Site", "Room"]);
-    const externalKey = [date ?? "", startTime ?? "", studentName, educator ?? ""].join(
-      "|",
-    );
+    const status = pick(row, ["Status", "Attendance", "Lesson Status"]);
+    const externalKey = [
+      date ?? "",
+      startTime ?? "",
+      studentName,
+      educator ?? "",
+      service ?? "",
+    ].join("|");
 
     out.push({
       externalKey,
@@ -202,9 +210,11 @@ export function mapLessons(rows: Record<string, string>[]): ParsedLesson[] {
       title,
       educator,
       educatorFirst: ef,
+      educatorLast: el,
       studentName,
       service,
       location,
+      status,
     });
   }
   return out;

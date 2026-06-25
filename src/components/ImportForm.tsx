@@ -46,6 +46,7 @@ export default function ImportForm() {
             className="rounded-lg border border-stone-200 px-2 py-1 text-sm"
           >
             <option value="">Auto-detect</option>
+            <option value="lessons">My sessions (Lesson Summary)</option>
             <option value="students">Students</option>
             <option value="schedule">Schedule / lessons</option>
           </select>
