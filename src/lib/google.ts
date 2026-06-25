@@ -39,20 +39,39 @@ function parseFrom(raw: string): { fromName: string; from: string } {
   return { fromName: raw.trim(), from: raw.trim() };
 }
 
+// Marketing / automated senders that are never a real family — filtered out of
+// the "needs a reply" list. Matched loosely against the From field (name or
+// domain), so "asana" catches anything @asana.com. Add more terms here anytime.
+export const IGNORED_SENDER_TERMS = ["asana", "verve"];
+
 /**
- * Fetch emails that likely need a reply: important OR starred messages in the
- * inbox that are unread, from the last ~30 days. Falls back gracefully on error.
+ * Fetch emails that need a reply: everything in the inbox that ISN'T labeled
+ * "Done", excluding Gmail's promotional/social/forum categories and known
+ * marketing senders. Starred mail (Shaina's "I need to act on this" signal) is
+ * pulled to the top. Falls back gracefully on error.
  */
 export async function fetchActionEmails(
   accessToken: string,
-  max = 12,
+  max = 30,
 ): Promise<EmailItem[]> {
   const gmail = google.gmail({ version: "v1", auth: clientFor(accessToken) });
 
+  const ignore = IGNORED_SENDER_TERMS.map((t) => `-from:${t}`).join(" ");
+  const q = [
+    "in:inbox",
+    "-label:Done", // the COO's "handled" signal
+    "-category:promotions",
+    "-category:social",
+    "-category:forums",
+    "newer_than:90d",
+    ignore,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   const list = await gmail.users.messages.list({
     userId: "me",
-    // Unread inbox mail that Gmail thinks matters, or that the user starred.
-    q: "in:inbox is:unread (is:important OR is:starred OR category:primary) newer_than:30d",
+    q,
     maxResults: max,
   });
 
@@ -70,7 +89,7 @@ export async function fetchActionEmails(
     ),
   );
 
-  return messages.map((res) => {
+  const items = messages.map((res) => {
     const m = res.data;
     const headers = m.payload?.headers ?? [];
     const { fromName, from } = parseFrom(header(headers, "From"));
@@ -93,6 +112,14 @@ export async function fetchActionEmails(
       link: `https://mail.google.com/mail/u/0/#inbox/${m.threadId}`,
     };
   });
+
+  // Starred ("I need to act on this") first, then most recent.
+  items.sort(
+    (a, b) =>
+      Number(b.starred) - Number(a.starred) ||
+      new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
+  return items;
 }
 
 export interface DocItem {
