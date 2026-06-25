@@ -1,13 +1,15 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { fetchActionEmails, fetchRecentDocs } from "@/lib/google";
+import {
+  fetchActionEmails,
+  fetchRecentDocs,
+  fetchSchedulingEmails,
+} from "@/lib/google";
 import {
   loadIdeas,
   loadReminders,
   loadStudents,
-  loadPendingSchedule,
-  loadKpis,
   loadDismissedEmailIds,
   buildSnapshot,
 } from "@/lib/data";
@@ -17,11 +19,10 @@ import Header from "@/components/Header";
 import AffirmationBlock from "@/components/AffirmationBlock";
 import SuggestionsPanel from "@/components/widgets/SuggestionsPanel";
 import EmailsWidget from "@/components/widgets/EmailsWidget";
-import ScheduleWidget from "@/components/widgets/ScheduleWidget";
+import PendingSchedulingWidget from "@/components/widgets/PendingSchedulingWidget";
 import StudentsWidget from "@/components/widgets/StudentsWidget";
 import IdeasWidget from "@/components/widgets/IdeasWidget";
 import RemindersWidget from "@/components/widgets/RemindersWidget";
-import KpisWidget from "@/components/widgets/KpisWidget";
 import DocsWidget from "@/components/widgets/DocsWidget";
 
 // Always render fresh — this is a live operations view.
@@ -42,20 +43,25 @@ export default async function DashboardPage() {
   const accessToken = (session as any)?.accessToken as string | undefined;
   const authError = (session as any)?.error as string | undefined;
 
-  // --- Live Google data (degrade gracefully if the API call fails) ---------
+  // --- Live Google data (degrade gracefully if a call fails) --------------
   let emails: Awaited<ReturnType<typeof fetchActionEmails>> = [];
   let docs: Awaited<ReturnType<typeof fetchRecentDocs>> = [];
+  let scheduling: Awaited<ReturnType<typeof fetchSchedulingEmails>> = [];
   let emailError: string | null = null;
   let docsError: string | null = null;
+  let schedulingError: string | null = null;
 
   if (!accessToken || authError) {
-    emailError = docsError =
-      "Google access expired. Sign out and back in to reconnect.";
+    emailError =
+      docsError =
+      schedulingError =
+        "Google access expired. Sign out and back in to reconnect.";
   } else {
     const dismissed = await loadDismissedEmailIds(userEmail);
-    const [emailRes, docRes] = await Promise.allSettled([
+    const [emailRes, docRes, schedRes] = await Promise.allSettled([
       fetchActionEmails(accessToken),
       fetchRecentDocs(accessToken, { max: 8 }),
+      fetchSchedulingEmails(accessToken),
     ]);
     if (emailRes.status === "fulfilled") {
       emails = emailRes.value.filter((e) => !dismissed.has(e.id));
@@ -67,21 +73,24 @@ export default async function DashboardPage() {
     else
       docsError =
         "Couldn't load Drive. Make sure the Drive API is enabled and access was granted.";
+    if (schedRes.status === "fulfilled") scheduling = schedRes.value;
+    else
+      schedulingError =
+        "Couldn't load your scheduling labels from Gmail.";
   }
 
   // --- Database-backed data ------------------------------------------------
-  const [ideas, reminders, students, schedule, kpis] = await Promise.all([
+  const [ideas, reminders, students] = await Promise.all([
     loadIdeas(userEmail),
     loadReminders(userEmail),
     loadStudents(userEmail),
-    loadPendingSchedule(userEmail),
-    loadKpis(userEmail),
   ]);
 
   // --- Suggestion engine ---------------------------------------------------
   const snapshot = await buildSnapshot(
     userEmail,
     emails.map((e) => ({ from: e.from, fromName: e.fromName, date: e.date })),
+    scheduling.length,
   );
   const { suggestions, engine } = await getSuggestions(snapshot);
 
@@ -111,15 +120,16 @@ export default async function DashboardPage() {
               }))}
               error={emailError}
             />
-            <ScheduleWidget
-              items={schedule.map((s) => ({
-                id: s.id,
-                studentName: s.studentName,
-                instructor: s.instructor,
-                subject: s.subject,
-                startsAt: s.startsAt ? s.startsAt.toISOString() : null,
-                location: s.location,
+            <PendingSchedulingWidget
+              items={scheduling.map((e) => ({
+                id: e.id,
+                fromName: e.fromName,
+                subject: e.subject,
+                date: e.date,
+                starred: e.starred,
+                link: e.link,
               }))}
+              error={schedulingError}
             />
           </div>
 
@@ -141,7 +151,7 @@ export default async function DashboardPage() {
             <DocsWidget docs={docs} error={docsError} />
           </div>
 
-          {/* Column 3 — my head: ideas, reminders, metrics */}
+          {/* Column 3 — my head: ideas + reminders */}
           <div className="space-y-5">
             <IdeasWidget
               ideas={ideas.map((i) => ({
@@ -163,22 +173,11 @@ export default async function DashboardPage() {
                 done: r.done,
               }))}
             />
-            <KpisWidget
-              kpis={kpis.map((k) => ({
-                id: k.id,
-                name: k.name,
-                value: k.value,
-                target: k.target,
-                unit: k.unit,
-                period: k.period,
-                higherIsBetter: k.higherIsBetter,
-              }))}
-            />
           </div>
         </div>
 
         <footer className="pt-2 text-center text-xs text-stone-400">
-          Wildewood Education · Operations dashboard · data refreshes on load
+          Wildewood Education · Operations dashboard · refreshes on load
         </footer>
       </main>
     </div>

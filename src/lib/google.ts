@@ -44,38 +44,28 @@ function parseFrom(raw: string): { fromName: string; from: string } {
 // domain), so "asana" catches anything @asana.com. Add more terms here anytime.
 export const IGNORED_SENDER_TERMS = ["asana", "verve"];
 
-/**
- * Fetch emails that need a reply: everything in the inbox that ISN'T labeled
- * "Done", excluding Gmail's promotional/social/forum categories and known
- * marketing senders. Starred mail (Shaina's "I need to act on this" signal) is
- * pulled to the top. Falls back gracefully on error.
- */
-export async function fetchActionEmails(
-  accessToken: string,
-  max = 30,
+// Shaina's Gmail label names (her source of truth). Edit here if she renames one.
+export const LABELS = {
+  done: "DONE!",
+  // Both of these count as "pending scheduling" from the new-family pipeline.
+  schedulingPending: ["SCHEDULING - PENDING", "Summer Scheduling"],
+  collegeLaunch: "College Launch",
+};
+
+/** Run a Gmail search and return mapped results, starred-first then newest. */
+async function listEmails(
+  gmail: any,
+  q: string,
+  max: number,
 ): Promise<EmailItem[]> {
-  const gmail = google.gmail({ version: "v1", auth: clientFor(accessToken) });
-
-  const ignore = IGNORED_SENDER_TERMS.map((t) => `-from:${t}`).join(" ");
-  const q = [
-    "in:inbox",
-    "-label:Done", // the COO's "handled" signal
-    "-category:promotions",
-    "-category:social",
-    "-category:forums",
-    "newer_than:90d",
-    ignore,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
   const list = await gmail.users.messages.list({
     userId: "me",
     q,
     maxResults: max,
   });
 
-  const ids = list.data.messages?.map((m) => m.id!).filter(Boolean) ?? [];
+  const ids: string[] =
+    list.data.messages?.map((m: any) => m.id!).filter(Boolean) ?? [];
   if (ids.length === 0) return [];
 
   const messages = await Promise.all(
@@ -89,7 +79,7 @@ export async function fetchActionEmails(
     ),
   );
 
-  const items = messages.map((res) => {
+  const items: EmailItem[] = messages.map((res: any) => {
     const m = res.data;
     const headers = m.payload?.headers ?? [];
     const { fromName, from } = parseFrom(header(headers, "From"));
@@ -113,13 +103,55 @@ export async function fetchActionEmails(
     };
   });
 
-  // Starred ("I need to act on this") first, then most recent.
   items.sort(
     (a, b) =>
       Number(b.starred) - Number(a.starred) ||
       new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
   return items;
+}
+
+/**
+ * Pending scheduling — pulled from the scheduling labels in Shaina's
+ * new-family pipeline, minus anything already marked DONE!.
+ */
+export async function fetchSchedulingEmails(
+  accessToken: string,
+  max = 25,
+): Promise<EmailItem[]> {
+  const gmail = google.gmail({ version: "v1", auth: clientFor(accessToken) });
+  const labelClause = LABELS.schedulingPending
+    .map((l) => `label:"${l}"`)
+    .join(" OR ");
+  const q = `(${labelClause}) -label:"${LABELS.done}"`;
+  return listEmails(gmail, q, max);
+}
+
+/**
+ * Fetch emails that need a reply: everything in the inbox that ISN'T labeled
+ * "Done", excluding Gmail's promotional/social/forum categories and known
+ * marketing senders. Starred mail (Shaina's "I need to act on this" signal) is
+ * pulled to the top. Falls back gracefully on error.
+ */
+export async function fetchActionEmails(
+  accessToken: string,
+  max = 30,
+): Promise<EmailItem[]> {
+  const gmail = google.gmail({ version: "v1", auth: clientFor(accessToken) });
+
+  const ignore = IGNORED_SENDER_TERMS.map((t) => `-from:${t}`).join(" ");
+  const q = [
+    "in:inbox",
+    `-label:"${LABELS.done}"`, // the COO's "handled" signal
+    "-category:promotions",
+    "-category:social",
+    "-category:forums",
+    "newer_than:90d",
+    ignore,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return listEmails(gmail, q, max);
 }
 
 export interface DocItem {
