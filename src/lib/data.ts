@@ -81,6 +81,23 @@ export async function loadMyStudentCount(userEmail: string): Promise<number> {
   }
 }
 
+/** Map of studentName -> manually linked notes doc. Defensive if table missing. */
+export async function loadNotesDocLinks(
+  userEmail: string,
+): Promise<Map<string, { docId: string; link: string | null }>> {
+  try {
+    const rows = await prisma.studentNotesDoc.findMany({
+      where: { userEmail },
+      select: { studentName: true, docId: true, link: true },
+    });
+    return new Map(
+      rows.map((r) => [r.studentName, { docId: r.docId, link: r.link }]),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
 export interface TodoState {
   status: string;
   snoozeUntil: Date | null;

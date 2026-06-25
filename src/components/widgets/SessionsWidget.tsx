@@ -1,6 +1,7 @@
 import { ClipboardCheck, FileText, UserCheck, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { Card, Empty, Pill } from "@/components/ui";
+import ConnectDocButton from "@/components/widgets/ConnectDocButton";
 
 export interface SessionActionView {
   id: string;
@@ -66,36 +67,38 @@ export default function SessionsWidget({
                       <UserCheck className="h-3 w-3" /> Mark attended
                     </span>
                   )}
-                  {it.needsNotes &&
-                    (it.notesDocLink ? (
-                      <a
-                        href={it.notesDocLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
-                          it.notesOverdue
-                            ? "bg-red-50 text-red-700"
-                            : "bg-emerald-50 text-emerald-700"
-                        }`}
-                      >
-                        <FileText className="h-3 w-3" />
-                        {it.notesOverdue ? "Notes overdue" : "Update notes"}
-                        <ExternalLink className="h-2.5 w-2.5" />
-                      </a>
-                    ) : (
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
-                          it.notesOverdue
-                            ? "bg-red-50 text-red-700"
-                            : "bg-emerald-50 text-emerald-700"
-                        }`}
-                        title="Couldn't find this student's notes doc in Drive"
-                      >
-                        <FileText className="h-3 w-3" />
-                        {it.notesOverdue ? "Notes overdue" : "Update notes"} (doc?)
-                      </span>
-                    ))}
+                  {it.needsNotes && it.notesDocLink && (
+                    <a
+                      href={it.notesDocLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
+                        it.notesOverdue
+                          ? "bg-red-50 text-red-700"
+                          : "bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      <FileText className="h-3 w-3" />
+                      {it.notesOverdue ? "Notes overdue" : "Update notes"}
+                      <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  )}
+                  {it.needsNotes && !it.notesDocLink && (
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
+                        it.notesOverdue
+                          ? "bg-red-50 text-red-700"
+                          : "bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      <FileText className="h-3 w-3" />
+                      {it.notesOverdue ? "Notes overdue" : "Notes due"}
+                    </span>
+                  )}
                 </div>
+                {it.needsNotes && !it.notesDocLink && (
+                  <ConnectDocButton studentName={it.student} />
+                )}
               </div>
             </li>
           ))}

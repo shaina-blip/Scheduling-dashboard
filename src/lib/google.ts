@@ -314,3 +314,62 @@ export async function findNotesDoc(
   }
   return null;
 }
+
+/** Fetch a specific doc's edit metadata by id (for manually-linked docs). */
+export async function getNotesDocById(
+  accessToken: string,
+  docId: string,
+  signedInEmail?: string | null,
+): Promise<NotesDoc | null> {
+  const drive = google.drive({ version: "v3", auth: clientFor(accessToken) });
+  const myEmail = (signedInEmail ?? "").toLowerCase();
+  try {
+    const res = await drive.files.get({
+      fileId: docId,
+      supportsAllDrives: true,
+      fields: "id,modifiedTime,webViewLink,lastModifyingUser(me,emailAddress)",
+    });
+    const f = res.data;
+    const editor = f.lastModifyingUser;
+    return {
+      link: f.webViewLink ?? `https://docs.google.com/document/d/${f.id}/edit`,
+      modifiedTime: f.modifiedTime ?? null,
+      modifiedByMe:
+        editor?.me === true ||
+        (!!myEmail && (editor?.emailAddress ?? "").toLowerCase() === myEmail),
+    };
+  } catch (err) {
+    console.error("getNotesDocById failed", docId, err);
+    return null;
+  }
+}
+
+/** Search Google Docs across all drives by name (for the manual connect UI). */
+export async function searchDocs(
+  accessToken: string,
+  query: string,
+  max = 10,
+): Promise<DocItem[]> {
+  const drive = google.drive({ version: "v3", auth: clientFor(accessToken) });
+  const safe = query.replace(/'/g, "\\'");
+  try {
+    const res = await drive.files.list({
+      q: `mimeType='application/vnd.google-apps.document' and name contains '${safe}' and trashed = false`,
+      corpora: "allDrives",
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true,
+      orderBy: "modifiedTime desc",
+      pageSize: max,
+      fields: "files(id,name,modifiedTime,webViewLink)",
+    });
+    return (res.data.files ?? []).map((f) => ({
+      id: f.id!,
+      name: f.name ?? "Untitled",
+      link: f.webViewLink ?? `https://docs.google.com/document/d/${f.id}/edit`,
+      modifiedTime: f.modifiedTime ?? new Date().toISOString(),
+    }));
+  } catch (err) {
+    console.error("searchDocs failed", query, err);
+    return [];
+  }
+}

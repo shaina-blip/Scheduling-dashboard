@@ -141,6 +141,20 @@ model Lesson {
   @@index([userEmail, date])
 }
 
+// --- Manual student -> notes doc links (when auto-match fails) --------------
+model StudentNotesDoc {
+  id          String   @id @default(cuid())
+  userEmail   String
+  studentName String
+  docId       String
+  docName     String?
+  link        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userEmail, studentName])
+}
+
 // --- KPIs ------------------------------------------------------------------
 model Kpi {
   id          String   @id @default(cuid())

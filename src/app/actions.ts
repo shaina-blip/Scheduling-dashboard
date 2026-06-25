@@ -183,6 +183,35 @@ export async function deleteStudent(id: string) {
   refresh();
 }
 
+// --- Manually connect a student's notes doc --------------------------------
+export async function searchNotesDocs(query: string) {
+  if (!query.trim()) return [];
+  const { getAccessToken } = await import("@/lib/session");
+  const { searchDocs } = await import("@/lib/google");
+  const token = await getAccessToken();
+  if (!token) return [];
+  return searchDocs(token, query.trim());
+}
+
+export async function connectNotesDoc(
+  studentName: string,
+  docId: string,
+  docName: string,
+  link: string,
+) {
+  const userEmail = await requireUserEmail();
+  try {
+    await prisma.studentNotesDoc.upsert({
+      where: { userEmail_studentName: { userEmail, studentName } },
+      update: { docId, docName, link },
+      create: { userEmail, studentName, docId, docName, link },
+    });
+  } catch (err) {
+    console.error("connectNotesDoc failed", err);
+  }
+  refresh();
+}
+
 // --- Lessons (my sessions to log) -----------------------------------------
 export async function toggleLessonFlag(
   id: string,
