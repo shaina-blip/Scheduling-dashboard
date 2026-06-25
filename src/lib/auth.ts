@@ -9,6 +9,9 @@ const GOOGLE_SCOPES = [
   "profile",
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/drive.readonly",
+  // Read the New Family Pipeline's Firestore as the signed-in user (no service
+  // account key needed). Works because she's an Owner of the GCP project.
+  "https://www.googleapis.com/auth/datastore",
 ].join(" ");
 
 function allowedEmails(): string[] {

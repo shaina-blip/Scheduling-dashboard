@@ -1,9 +1,11 @@
-import { GoogleAuth } from "google-auth-library";
-
 // Reads the New Family Pipeline's Firestore `families` collection (the same data
-// the pipeline web app writes). Auth is via a Firebase service account JSON
-// placed in FIREBASE_SERVICE_ACCOUNT (raw JSON or base64). Returns [] if not
-// configured, so the dashboard degrades to Gmail-only scheduling.
+// the pipeline web app writes). Auth is via the SIGNED-IN USER's Google token
+// (she's an Owner of the GCP project), so no service-account key is needed —
+// which sidesteps the org policy that blocks key creation. Returns [] if the
+// token is missing or the read isn't permitted, so the dashboard degrades to
+// Gmail-only scheduling.
+
+const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "weo-new-family-pipeline";
 
 export interface FamilyItem {
   id: string;
@@ -48,33 +50,27 @@ function fv(field: any): any {
   return null;
 }
 
-function loadCredentials(): any | null {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    try {
-      return JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
-    } catch {
-      return null;
-    }
-  }
-}
+export async function fetchPipelineFamilies(
+  accessToken: string | null | undefined,
+): Promise<FamilyItem[]> {
+  if (!accessToken) return [];
 
-export async function fetchPipelineFamilies(): Promise<FamilyItem[]> {
-  const creds = loadCredentials();
-  if (!creds?.project_id) return [];
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/families?pageSize=300`;
 
-  const auth = new GoogleAuth({
-    credentials: creds,
-    scopes: ["https://www.googleapis.com/auth/datastore"],
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
   });
-  const client = await auth.getClient();
-  const url = `https://firestore.googleapis.com/v1/projects/${creds.project_id}/databases/(default)/documents/families?pageSize=300`;
-
-  const res: any = await client.request({ url });
-  const docs: any[] = res.data?.documents ?? [];
+  if (!res.ok) {
+    console.error(
+      "Firestore read failed",
+      res.status,
+      await res.text().catch(() => ""),
+    );
+    return [];
+  }
+  const data: any = await res.json();
+  const docs: any[] = data.documents ?? [];
 
   const families: FamilyItem[] = docs.map((d) => {
     const f = d.fields ?? {};

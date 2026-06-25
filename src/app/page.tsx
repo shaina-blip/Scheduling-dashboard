@@ -85,7 +85,7 @@ export default async function DashboardPage() {
   // --- New Family Pipeline (Firestore — independent of Google sign-in) ------
   let families: Awaited<ReturnType<typeof fetchPipelineFamilies>> = [];
   try {
-    families = await fetchPipelineFamilies();
+    families = await fetchPipelineFamilies(accessToken);
   } catch (err) {
     console.error("pipeline fetch failed", err);
   }
