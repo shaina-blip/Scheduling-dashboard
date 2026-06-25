@@ -53,6 +53,7 @@ export async function loadDismissedEmailIds(userEmail: string) {
 export async function buildSnapshot(
   userEmail: string,
   emails: { from: string; fromName: string; date: string }[],
+  pendingSchedulingCount: number,
   now = new Date(),
 ): Promise<DashboardSnapshot> {
   const [students, schedule, reminders, kpis, ideas, sessions] =
@@ -167,7 +168,7 @@ export async function buildSnapshot(
     now: now.toISOString(),
     emails: { total: emails.length, oldestDays, topSenders },
     schedule: {
-      pending: pendingItems.length,
+      pending: pendingSchedulingCount,
       nextStart: nextStart ? nextStart.toISOString() : null,
       cancellationsLast30,
       sessionsLast30: sessions.length,

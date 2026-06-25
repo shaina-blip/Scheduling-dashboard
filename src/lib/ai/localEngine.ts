@@ -93,15 +93,15 @@ export function generateLocalSuggestions(s: DashboardSnapshot): Suggestion[] {
     });
   }
 
-  // --- Pending schedules ---------------------------------------------------
+  // --- Pending scheduling (from Gmail labels) ------------------------------
   if (s.schedule.pending > 0) {
     add({
-      title: `${plural(s.schedule.pending, "session")} pending confirmation`,
+      title: `${plural(s.schedule.pending, "family")} waiting on scheduling`,
       detail:
-        "Unconfirmed sessions are the most common source of last-minute scrambling. Confirm or clear them before they become today's problem.",
+        "These are sitting in your scheduling labels. Once a family is confirmed, notify the instructor and Tara, then label the thread DONE! to clear it.",
       severity: s.schedule.pending >= 5 ? "urgent" : "attention",
       category: "Schedule",
-      actionLabel: "Review schedule",
+      actionLabel: "Review scheduling",
       actionHref: "/#schedule",
       score: 75 + Math.min(s.schedule.pending, 12) * 4,
     });
@@ -144,62 +144,6 @@ export function generateLocalSuggestions(s: DashboardSnapshot): Suggestion[] {
       actionHref: "/#reminders",
       score: 40,
     });
-  }
-
-  // --- KPIs off target -----------------------------------------------------
-  for (const k of s.kpis.offTarget) {
-    const gap = k.target ? Math.round((1 - k.value / k.target) * 100) : 0;
-    add({
-      title: `${k.name} is below target`,
-      detail: `Currently ${k.value}${k.unit ?? ""} vs target ${k.target}${
-        k.unit ?? ""
-      }${gap > 0 ? ` (${gap}% under)` : ""}.`,
-      severity: gap >= 25 ? "attention" : "info",
-      category: "KPIs",
-      actionLabel: "View KPIs",
-      actionHref: "/#kpis",
-      score: 50 + gap,
-    });
-  }
-
-  // --- Pattern observations (the "smart" reads) ----------------------------
-  if (s.schedule.sessionsLast30 > 0) {
-    const cancelRate =
-      s.schedule.cancellationsLast30 / s.schedule.sessionsLast30;
-    if (cancelRate >= 0.15) {
-      add({
-        title: `Cancellation rate is running high (${Math.round(
-          cancelRate * 100,
-        )}%)`,
-        detail: `${s.schedule.cancellationsLast30} of ${s.schedule.sessionsLast30} sessions in the last 30 days were cancelled or no-shows. Worth checking whether it's concentrated on a specific day, instructor, or family.`,
-        severity: "attention",
-        category: "Pattern",
-        score: 60 + Math.round(cancelRate * 50),
-      });
-    }
-  }
-
-  const overloaded = s.students.instructorLoad
-    .filter((i) => i.count >= 1)
-    .sort((a, b) => b.count - a.count);
-  if (overloaded.length >= 2) {
-    const top = overloaded[0];
-    const avg =
-      overloaded.reduce((sum, i) => sum + i.count, 0) / overloaded.length;
-    if (top.count >= avg * 1.6 && top.count - avg >= 2) {
-      add({
-        title: `${top.instructor} is carrying a heavy load`,
-        detail: `${top.instructor} has ${plural(
-          top.count,
-          "active student",
-        )} — well above the ${avg.toFixed(
-          1,
-        )} average across instructors. Consider rebalancing before assigning new students.`,
-        severity: "info",
-        category: "Pattern",
-        score: 48,
-      });
-    }
   }
 
   // --- Projects / parking lot ----------------------------------------------
