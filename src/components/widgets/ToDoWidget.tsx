@@ -20,6 +20,8 @@ export interface TodoView {
   sources: ("pipeline" | "gmail")[];
   starred: boolean;
   stageName: string | null;
+  badge: string | null;
+  kind: "scheduling" | "action";
   emailLink: string | null;
   pipelineLink: string | null;
 }
@@ -42,7 +44,7 @@ export default function ToDoWidget({
   return (
     <Card
       id="todo"
-      title="To-Do · Pending Scheduling"
+      title="To-Do · Action & Scheduling"
       icon={<ListChecks className="h-4 w-4" />}
       count={items.length}
       accent="plum"
@@ -69,8 +71,10 @@ export default function ToDoWidget({
                     {it.starred && (
                       <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                     )}
-                    {it.sources.includes("pipeline") && it.stageName && (
-                      <Pill tone="plum">{it.stageName}</Pill>
+                    {it.badge && (
+                      <Pill tone={it.kind === "action" ? "rose" : "plum"}>
+                        {it.badge}
+                      </Pill>
                     )}
                     {it.sources.includes("gmail") && (
                       <Mail className="h-3 w-3 text-stone-400" />
@@ -160,8 +164,8 @@ export default function ToDoWidget({
         </ul>
       )}
       <p className="mt-3 rounded-xl bg-brand-50/60 px-3 py-2 text-[11px] leading-relaxed text-stone-500">
-        ✨ Merged from your pipeline + Gmail scheduling labels (deduped). Once a
-        family&apos;s schedule is confirmed, notify the instructor{" "}
+        ✨ Your @Action emails + pending scheduling (pipeline + Gmail, deduped).
+        When a family&apos;s schedule is confirmed, notify the instructor{" "}
         <strong>and Tara</strong>, then check it off.
       </p>
     </Card>
