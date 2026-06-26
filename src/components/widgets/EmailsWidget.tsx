@@ -14,6 +14,7 @@ export interface EmailView {
   date: string;
   starred: boolean;
   important: boolean;
+  action: boolean;
   threadCount: number;
   link: string;
 }
@@ -62,6 +63,11 @@ export default function EmailsWidget({
                   </span>
                   {e.starred && (
                     <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                  )}
+                  {e.action && (
+                    <span className="rounded-full bg-brand-100 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
+                      Action
+                    </span>
                   )}
                   {e.threadCount > 1 && (
                     <span className="rounded-full bg-stone-100 px-1.5 text-[10px] font-medium text-stone-500">

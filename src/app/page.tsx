@@ -6,6 +6,7 @@ import {
   fetchActionEmails,
   fetchRecentDocs,
   fetchSchedulingEmails,
+  fetchWaitingEmails,
   findNotesDoc,
   getNotesDocById,
 } from "@/lib/google";
@@ -29,6 +30,7 @@ import Header from "@/components/Header";
 import AffirmationBlock from "@/components/AffirmationBlock";
 import SuggestionsPanel from "@/components/widgets/SuggestionsPanel";
 import EmailsWidget from "@/components/widgets/EmailsWidget";
+import WaitingWidget from "@/components/widgets/WaitingWidget";
 import ToDoWidget from "@/components/widgets/ToDoWidget";
 import SessionsWidget from "@/components/widgets/SessionsWidget";
 import IdeasWidget from "@/components/widgets/IdeasWidget";
@@ -57,6 +59,7 @@ export default async function DashboardPage() {
   let emails: Awaited<ReturnType<typeof fetchActionEmails>> = [];
   let docs: Awaited<ReturnType<typeof fetchRecentDocs>> = [];
   let scheduling: Awaited<ReturnType<typeof fetchSchedulingEmails>> = [];
+  let waiting: Awaited<ReturnType<typeof fetchWaitingEmails>> = [];
   let emailError: string | null = null;
   let docsError: string | null = null;
   let schedulingError: string | null = null;
@@ -68,10 +71,11 @@ export default async function DashboardPage() {
         "Google access expired. Sign out and back in to reconnect.";
   } else {
     const dismissed = await loadDismissedEmailIds(userEmail);
-    const [emailRes, docRes, schedRes] = await Promise.allSettled([
+    const [emailRes, docRes, schedRes, waitRes] = await Promise.allSettled([
       fetchActionEmails(accessToken),
       fetchRecentDocs(accessToken, { max: 8 }),
       fetchSchedulingEmails(accessToken),
+      fetchWaitingEmails(accessToken),
     ]);
     if (emailRes.status === "fulfilled") {
       emails = emailRes.value.filter((e) => !dismissed.has(e.id));
@@ -83,6 +87,7 @@ export default async function DashboardPage() {
     else
       docsError =
         "Couldn't load Drive. Make sure the Drive API is enabled and access was granted.";
+    if (waitRes.status === "fulfilled") waiting = waitRes.value;
     if (schedRes.status === "fulfilled") scheduling = schedRes.value;
     else
       schedulingError =
@@ -241,7 +246,18 @@ export default async function DashboardPage() {
                 date: e.date,
                 starred: e.starred,
                 important: e.important,
+                action: e.action,
                 threadCount: e.threadCount,
+                link: e.link,
+              }))}
+              error={emailError}
+            />
+            <WaitingWidget
+              items={waiting.map((e) => ({
+                id: e.id,
+                fromName: e.fromName,
+                subject: e.subject,
+                date: e.date,
                 link: e.link,
               }))}
               error={emailError}

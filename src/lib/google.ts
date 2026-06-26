@@ -17,6 +17,7 @@ export interface EmailItem {
   unread: boolean;
   starred: boolean;
   important: boolean;
+  action: boolean; // has the @action label
   threadCount: number; // how many messages of this thread are in the result set
   body?: string; // plain-text body (only fetched when withBody is requested)
   link: string;
@@ -89,25 +90,43 @@ export const LABELS = {
  * containing "done" or "complete" (e.g. "DONE!", "Summer Scheduling - DONE").
  * Falls back to the hardcoded names if discovery finds nothing.
  */
-async function discoverLabels(
-  gmail: any,
-): Promise<{ done: string[]; scheduling: string[] }> {
+interface DiscoveredLabels {
+  done: string[];
+  scheduling: string[];
+  actionName: string | null;
+  actionId: string | null;
+  waitingName: string | null;
+}
+
+const bareName = (n: string) => n.toLowerCase().replace(/^@/, "").trim();
+
+async function discoverLabels(gmail: any): Promise<DiscoveredLabels> {
   try {
     const labels =
       (await gmail.users.labels.list({ userId: "me" })).data.labels ?? [];
-    const names: string[] = labels
-      .filter((l: any) => l.type === "user")
-      .map((l: any) => l.name as string);
+    const user = labels.filter((l: any) => l.type === "user");
+    const names: string[] = user.map((l: any) => l.name as string);
     const done = names.filter((n) => /done|complete/i.test(n));
     const scheduling = names.filter(
       (n) => /schedul/i.test(n) && !/done|complete/i.test(n),
     );
+    const actionLabel = user.find((l: any) => bareName(l.name) === "action");
+    const waitingLabel = user.find((l: any) => bareName(l.name) === "waiting");
     return {
       done: done.length ? done : [LABELS.done],
       scheduling: scheduling.length ? scheduling : LABELS.schedulingPending,
+      actionName: actionLabel?.name ?? null,
+      actionId: actionLabel?.id ?? null,
+      waitingName: waitingLabel?.name ?? null,
     };
   } catch {
-    return { done: [LABELS.done], scheduling: LABELS.schedulingPending };
+    return {
+      done: [LABELS.done],
+      scheduling: LABELS.schedulingPending,
+      actionName: null,
+      actionId: null,
+      waitingName: null,
+    };
   }
 }
 
@@ -118,6 +137,7 @@ async function listEmails(
   q: string,
   max: number,
   withBody = false,
+  actionLabelId: string | null = null,
 ): Promise<EmailItem[]> {
   const list = await gmail.users.messages.list({
     userId: "me",
@@ -162,6 +182,7 @@ async function listEmails(
       unread: labelIds.includes("UNREAD"),
       starred: labelIds.includes("STARRED"),
       important: labelIds.includes("IMPORTANT"),
+      action: actionLabelId ? labelIds.includes(actionLabelId) : false,
       threadCount: 1,
       body: withBody ? extractBody(m.payload).slice(0, 4000) : undefined,
       link: `https://mail.google.com/mail/u/0/#inbox/${m.threadId}`,
@@ -181,6 +202,7 @@ async function listEmails(
     ex.threadCount += 1;
     ex.starred = ex.starred || it.starred;
     ex.unread = ex.unread || it.unread;
+    ex.action = ex.action || it.action;
     if (new Date(it.date) > new Date(ex.date)) {
       ex.id = it.id;
       ex.date = it.date;
@@ -193,9 +215,10 @@ async function listEmails(
     }
   }
 
-  // Starred ("I need to act on this") first, then most recent.
+  // @action first, then starred, then most recent.
   return [...byThread.values()].sort(
     (a, b) =>
+      Number(b.action) - Number(a.action) ||
       Number(b.starred) - Number(a.starred) ||
       new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
@@ -230,12 +253,13 @@ export async function fetchActionEmails(
 ): Promise<EmailItem[]> {
   const gmail = google.gmail({ version: "v1", auth: clientFor(accessToken) });
 
-  const { done } = await discoverLabels(gmail);
+  const { done, actionId, waitingName } = await discoverLabels(gmail);
   const doneClause = done.map((l) => `-label:"${l}"`).join(" ");
   const ignore = IGNORED_SENDER_TERMS.map((t) => `-from:${t}`).join(" ");
   const q = [
     "in:inbox",
     doneClause, // the COO's "handled" signal(s)
+    waitingName ? `-label:"${waitingName}"` : "", // @waiting lives in its own widget
     "-category:promotions",
     "-category:social",
     "-category:forums",
@@ -244,6 +268,22 @@ export async function fetchActionEmails(
   ]
     .filter(Boolean)
     .join(" ");
+  return listEmails(gmail, q, max, false, actionId);
+}
+
+/**
+ * Emails Shaina is waiting to hear back on — her @waiting label, minus DONE!.
+ * Shown in a separate "Waiting On" widget so she can nudge stale ones.
+ */
+export async function fetchWaitingEmails(
+  accessToken: string,
+  max = 25,
+): Promise<EmailItem[]> {
+  const gmail = google.gmail({ version: "v1", auth: clientFor(accessToken) });
+  const { done, waitingName } = await discoverLabels(gmail);
+  if (!waitingName) return [];
+  const doneClause = done.map((l) => `-label:"${l}"`).join(" ");
+  const q = `label:"${waitingName}" ${doneClause}`.trim();
   return listEmails(gmail, q, max);
 }
 
