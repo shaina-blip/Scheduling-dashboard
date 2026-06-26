@@ -82,6 +82,35 @@ export const LABELS = {
   collegeLaunch: "College Launch",
 };
 
+/**
+ * Discover Shaina's scheduling + done labels from her actual Gmail, so the
+ * To-Do keeps working when she renames/adds labels. "Scheduling" = any label
+ * containing "schedul" (minus done/complete variants); "done" = any label
+ * containing "done" or "complete" (e.g. "DONE!", "Summer Scheduling - DONE").
+ * Falls back to the hardcoded names if discovery finds nothing.
+ */
+async function discoverLabels(
+  gmail: any,
+): Promise<{ done: string[]; scheduling: string[] }> {
+  try {
+    const labels =
+      (await gmail.users.labels.list({ userId: "me" })).data.labels ?? [];
+    const names: string[] = labels
+      .filter((l: any) => l.type === "user")
+      .map((l: any) => l.name as string);
+    const done = names.filter((n) => /done|complete/i.test(n));
+    const scheduling = names.filter(
+      (n) => /schedul/i.test(n) && !/done|complete/i.test(n),
+    );
+    return {
+      done: done.length ? done : [LABELS.done],
+      scheduling: scheduling.length ? scheduling : LABELS.schedulingPending,
+    };
+  } catch {
+    return { done: [LABELS.done], scheduling: LABELS.schedulingPending };
+  }
+}
+
 /** Run a Gmail search and return mapped results, starred-first then newest.
  * Pass withBody to fetch full message bodies (used to find the student name). */
 async function listEmails(
@@ -181,10 +210,11 @@ export async function fetchSchedulingEmails(
   max = 25,
 ): Promise<EmailItem[]> {
   const gmail = google.gmail({ version: "v1", auth: clientFor(accessToken) });
-  const labelClause = LABELS.schedulingPending
-    .map((l) => `label:"${l}"`)
-    .join(" OR ");
-  const q = `(${labelClause}) -label:"${LABELS.done}"`;
+  const { done, scheduling } = await discoverLabels(gmail);
+  if (!scheduling.length) return [];
+  const labelClause = scheduling.map((l) => `label:"${l}"`).join(" OR ");
+  const doneClause = done.map((l) => `-label:"${l}"`).join(" ");
+  const q = `(${labelClause}) ${doneClause}`.trim();
   return listEmails(gmail, q, max, true);
 }
 
@@ -200,10 +230,12 @@ export async function fetchActionEmails(
 ): Promise<EmailItem[]> {
   const gmail = google.gmail({ version: "v1", auth: clientFor(accessToken) });
 
+  const { done } = await discoverLabels(gmail);
+  const doneClause = done.map((l) => `-label:"${l}"`).join(" ");
   const ignore = IGNORED_SENDER_TERMS.map((t) => `-from:${t}`).join(" ");
   const q = [
     "in:inbox",
-    `-label:"${LABELS.done}"`, // the COO's "handled" signal
+    doneClause, // the COO's "handled" signal(s)
     "-category:promotions",
     "-category:social",
     "-category:forums",
