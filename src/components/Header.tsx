@@ -3,6 +3,7 @@
 import { signOut } from "next-auth/react";
 import { LogOut, Upload, ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import { LOGO_DATA_URI } from "@/lib/logo";
 
 export default function Header({
   name,
@@ -16,8 +17,9 @@ export default function Header({
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/wildewood-logo.png"
+            src={LOGO_DATA_URI}
             alt="Wildewood Education"
             className="h-9 w-auto"
           />

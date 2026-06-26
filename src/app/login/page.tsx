@@ -2,6 +2,7 @@
 
 import { signIn } from "next-auth/react";
 import { Suspense } from "react";
+import { LOGO_DATA_URI } from "@/lib/logo";
 import { useSearchParams } from "next/navigation";
 
 function LoginInner() {
@@ -12,8 +13,9 @@ function LoginInner() {
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-200 via-brand-100 to-brand-50 p-6">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-8 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/wildewood-logo.png"
+          src={LOGO_DATA_URI}
           alt="Wildewood Education"
           className="mx-auto mb-4 h-14 w-auto"
         />
