@@ -17,7 +17,7 @@ export default function Header({
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logo.png"
+            src="/wildewood-logo.png"
             alt="Wildewood Education"
             className="h-9 w-auto"
           />

@@ -13,7 +13,7 @@ function LoginInner() {
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-8 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logo.png"
+          src="/wildewood-logo.png"
           alt="Wildewood Education"
           className="mx-auto mb-4 h-14 w-auto"
         />
