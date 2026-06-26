@@ -183,6 +183,20 @@ export async function deleteStudent(id: string) {
   refresh();
 }
 
+// --- Gmail audit -----------------------------------------------------------
+export async function runGmailAuditAction() {
+  const { getAccessToken } = await import("@/lib/session");
+  const { runGmailAudit } = await import("@/lib/google");
+  const token = await getAccessToken();
+  if (!token) return null;
+  try {
+    return await runGmailAudit(token);
+  } catch (err) {
+    console.error("runGmailAuditAction failed", err);
+    return null;
+  }
+}
+
 // --- Manually connect a student's notes doc --------------------------------
 export async function searchNotesDocs(query: string) {
   if (!query.trim()) return [];

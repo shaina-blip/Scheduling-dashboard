@@ -1,7 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { LogOut, Upload } from "lucide-react";
+import { LogOut, Upload, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 export default function Header({
@@ -27,6 +27,13 @@ export default function Header({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/audit"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+          >
+            <ShieldCheck className="h-4 w-4" />
+            Gmail Audit
+          </Link>
           <Link
             href="/import"
             className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"

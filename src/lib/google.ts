@@ -254,6 +254,158 @@ export async function fetchRecentDocs(
   }));
 }
 
+// ---------------------------------------------------------------------------
+// Gmail Organization Audit — ported from Shaina's local Python audit script.
+// ---------------------------------------------------------------------------
+export interface GmailAudit {
+  email: string;
+  messagesTotal: number;
+  threadsTotal: number;
+  inboxTotal: number;
+  systemLabelCount: number;
+  customLabels: string[];
+  nestedCount: number;
+  flatCount: number;
+  filters: { rule: string; action: string }[];
+  topSenders: { sender: string; count: number }[];
+  sampleSize: number;
+  suggestions: string[];
+}
+
+export async function runGmailAudit(accessToken: string): Promise<GmailAudit> {
+  const gmail = google.gmail({ version: "v1", auth: clientFor(accessToken) });
+
+  const profile = (await gmail.users.getProfile({ userId: "me" })).data;
+
+  const labels =
+    (await gmail.users.labels.list({ userId: "me" })).data.labels ?? [];
+  const idToName = new Map(labels.map((l) => [l.id!, l.name!]));
+  const userLabels = labels.filter((l) => l.type === "user");
+  const systemLabels = labels.filter((l) => l.type === "system");
+  const nested = userLabels.filter((l) => (l.name ?? "").includes("/"));
+  const flat = userLabels.filter((l) => !(l.name ?? "").includes("/"));
+
+  let rawFilters: any[] = [];
+  try {
+    rawFilters =
+      (await gmail.users.settings.filters.list({ userId: "me" })).data.filter ??
+      [];
+  } catch (e) {
+    console.error("audit: filters fetch failed", e);
+  }
+  const filters = rawFilters.map((f: any) => {
+    const c = f.criteria ?? {};
+    const a = f.action ?? {};
+    const rule =
+      [
+        c.from && `from:${c.from}`,
+        c.to && `to:${c.to}`,
+        c.subject && `subject:${c.subject}`,
+        c.query,
+      ]
+        .filter(Boolean)
+        .join(" AND ") || "(any)";
+    const adds = (a.addLabelIds ?? []).map(
+      (id: string) => idToName.get(id) ?? id,
+    );
+    const rems = (a.removeLabelIds ?? []).map((id: string) =>
+      id === "INBOX" ? "skip inbox" : idToName.get(id) ?? id,
+    );
+    const action =
+      [
+        adds.length ? `label → ${adds.join(", ")}` : "",
+        rems.length ? `${rems.join(", ")}` : "",
+      ]
+        .filter(Boolean)
+        .join("; ") || "(no action)";
+    return { rule, action };
+  });
+
+  const listRes = (
+    await gmail.users.messages.list({
+      userId: "me",
+      labelIds: ["INBOX"],
+      maxResults: 100,
+    })
+  ).data;
+  const inboxMessages = listRes.messages ?? [];
+  const inboxTotal = listRes.resultSizeEstimate ?? inboxMessages.length;
+
+  const sample = inboxMessages.slice(0, 50);
+  const senderCounts = new Map<string, number>();
+  await Promise.all(
+    sample.map(async (m) => {
+      try {
+        const d = (
+          await gmail.users.messages.get({
+            userId: "me",
+            id: m.id!,
+            format: "metadata",
+            metadataHeaders: ["From"],
+          })
+        ).data;
+        const from = (d.payload?.headers ?? []).find(
+          (h) => h.name === "From",
+        )?.value;
+        if (from) senderCounts.set(from, (senderCounts.get(from) ?? 0) + 1);
+      } catch {
+        /* skip */
+      }
+    }),
+  );
+  const topSenders = [...senderCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([sender, count]) => ({ sender, count }));
+
+  const suggestions: string[] = [];
+  if (inboxTotal > 1000)
+    suggestions.push(
+      `Your inbox has ${inboxTotal.toLocaleString()} messages — consider a bulk archive pass (try a search of "is:read older_than:6m").`,
+    );
+  if (userLabels.length === 0)
+    suggestions.push(
+      "You have no custom labels — create a few top-level categories (e.g. Work, Finance, Admin, Personal).",
+    );
+  else if (userLabels.length > 30)
+    suggestions.push(
+      `You have ${userLabels.length} custom labels — consider consolidating into nested labels (e.g. Work/Projects, Work/Invoices).`,
+    );
+  if (nested.length === 0 && userLabels.length > 5)
+    suggestions.push(
+      "None of your labels are nested — use '/' in a label name to create a hierarchy (e.g. 'School/Admin').",
+    );
+  if (rawFilters.length === 0)
+    suggestions.push(
+      "You have no Gmail filters — filters auto-label/archive incoming mail (great for newsletters, receipts, notifications).",
+    );
+  else if (rawFilters.length < 5)
+    suggestions.push(
+      `You only have ${rawFilters.length} filter(s) — consider adding filters for recurring senders to keep them out of the inbox.`,
+    );
+  if (topSenders.length && topSenders[0].count > 10)
+    suggestions.push(
+      `"${topSenders[0].sender}" appears ${topSenders[0].count}× in your inbox sample — if it's a newsletter/notification, filter it to skip the inbox.`,
+    );
+  if (!suggestions.length)
+    suggestions.push("Your Gmail looks well-organized — no major issues found. 🎉");
+
+  return {
+    email: profile.emailAddress ?? "",
+    messagesTotal: profile.messagesTotal ?? 0,
+    threadsTotal: profile.threadsTotal ?? 0,
+    inboxTotal,
+    systemLabelCount: systemLabels.length,
+    customLabels: userLabels.map((l) => l.name!).sort(),
+    nestedCount: nested.length,
+    flatCount: flat.length,
+    filters,
+    topSenders,
+    sampleSize: sample.length,
+    suggestions,
+  };
+}
+
 export interface NotesDoc {
   link: string;
   modifiedTime: string | null;
