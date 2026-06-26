@@ -197,6 +197,16 @@ model ScheduleTodoState {
   @@index([userEmail])
 }
 
+// --- Per-user dashboard layout (widget order + hidden) ---------------------
+model UserPrefs {
+  id            String   @id @default(cuid())
+  userEmail     String   @unique
+  widgetOrder   String[] @default([])
+  hiddenWidgets String[] @default([])
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+}
+
 // --- Import audit log ------------------------------------------------------
 model ImportLog {
   id          String   @id @default(cuid())

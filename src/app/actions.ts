@@ -183,6 +183,21 @@ export async function deleteStudent(id: string) {
   refresh();
 }
 
+// --- Dashboard layout prefs ------------------------------------------------
+export async function saveWidgetPrefs(order: string[], hidden: string[]) {
+  const userEmail = await requireUserEmail();
+  try {
+    await prisma.userPrefs.upsert({
+      where: { userEmail },
+      update: { widgetOrder: order, hiddenWidgets: hidden },
+      create: { userEmail, widgetOrder: order, hiddenWidgets: hidden },
+    });
+  } catch (err) {
+    console.error("saveWidgetPrefs failed", err);
+  }
+  refresh();
+}
+
 // --- Gmail audit -----------------------------------------------------------
 export async function runGmailAuditAction() {
   const { getAccessToken } = await import("@/lib/session");

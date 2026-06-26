@@ -81,6 +81,18 @@ export async function loadMyStudentCount(userEmail: string): Promise<number> {
   }
 }
 
+/** Per-user dashboard layout. Defensive if the table doesn't exist yet. */
+export async function loadUserPrefs(
+  userEmail: string,
+): Promise<{ order: string[]; hidden: string[] }> {
+  try {
+    const p = await prisma.userPrefs.findUnique({ where: { userEmail } });
+    return { order: p?.widgetOrder ?? [], hidden: p?.hiddenWidgets ?? [] };
+  } catch {
+    return { order: [], hidden: [] };
+  }
+}
+
 /** Map of studentName -> manually linked notes doc. Defensive if table missing. */
 export async function loadNotesDocLinks(
   userEmail: string,

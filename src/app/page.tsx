@@ -18,6 +18,7 @@ import {
   loadMyRecentSessions,
   loadMyStudentCount,
   loadNotesDocLinks,
+  loadUserPrefs,
   programOf,
   buildSnapshot,
 } from "@/lib/data";
@@ -28,6 +29,7 @@ import { getSuggestions } from "@/lib/ai";
 
 import Header from "@/components/Header";
 import AffirmationBlock from "@/components/AffirmationBlock";
+import CustomizableGrid from "@/components/CustomizableGrid";
 import SuggestionsPanel from "@/components/widgets/SuggestionsPanel";
 import EmailsWidget from "@/components/widgets/EmailsWidget";
 import WaitingWidget from "@/components/widgets/WaitingWidget";
@@ -110,6 +112,7 @@ export default async function DashboardPage() {
     recentSessions,
     studentCount,
     notesLinks,
+    prefs,
   ] = await Promise.all([
     loadIdeas(userEmail),
     loadReminders(userEmail),
@@ -117,6 +120,7 @@ export default async function DashboardPage() {
     loadMyRecentSessions(userEmail),
     loadMyStudentCount(userEmail),
     loadNotesDocLinks(userEmail),
+    loadUserPrefs(userEmail),
   ]);
 
   // --- Sessions tracker: cross-reference each session against the student's
@@ -250,6 +254,120 @@ export default async function DashboardPage() {
 
   const firstName = (session?.user?.name ?? userEmail).split(" ")[0];
 
+  const widgetItems = [
+    {
+      key: "todo",
+      title: "To-Do",
+      node: (
+        <ToDoWidget
+          items={todos.map((t) => ({
+            key: t.key,
+            title: t.title,
+            student: t.student,
+            subtitle: t.subtitle,
+            sources: t.sources,
+            starred: t.starred,
+            stageName: t.stageName,
+            badge: t.badge,
+            kind: t.kind,
+            emailLink: t.emailLink,
+            pipelineLink: t.pipelineLink,
+          }))}
+          error={schedulingError}
+        />
+      ),
+    },
+    {
+      key: "emails",
+      title: "Emails",
+      node: (
+        <EmailsWidget
+          emails={emails.map((e) => ({
+            id: e.id,
+            fromName: e.fromName,
+            subject: e.subject,
+            snippet: e.snippet,
+            date: e.date,
+            starred: e.starred,
+            important: e.important,
+            action: e.action,
+            threadCount: e.threadCount,
+            link: e.link,
+          }))}
+          error={emailError}
+        />
+      ),
+    },
+    {
+      key: "sessions",
+      title: "My Sessions",
+      node: (
+        <SessionsWidget
+          items={sessionActions}
+          studentCount={studentCount}
+          error={
+            !accessToken || authError
+              ? "Google access expired. Sign out and back in to reconnect."
+              : null
+          }
+        />
+      ),
+    },
+    {
+      key: "waiting",
+      title: "Waiting On",
+      node: (
+        <WaitingWidget
+          items={waiting.map((e) => ({
+            id: e.id,
+            fromName: e.fromName,
+            subject: e.subject,
+            date: e.date,
+            link: e.link,
+          }))}
+          error={emailError}
+        />
+      ),
+    },
+    {
+      key: "reminders",
+      title: "Reminders",
+      node: (
+        <RemindersWidget
+          reminders={reminders.map((r) => ({
+            id: r.id,
+            title: r.title,
+            category: r.category,
+            dueDate: r.dueDate ? r.dueDate.toISOString() : null,
+            recurrence: r.recurrence,
+            done: r.done,
+          }))}
+        />
+      ),
+    },
+    {
+      key: "ideas",
+      title: "Ideas & Projects",
+      node: (
+        <IdeasWidget
+          ideas={ideas.map((i) => ({
+            id: i.id,
+            title: i.title,
+            details: i.details,
+            kind: i.kind,
+            status: i.status,
+            priority: i.priority,
+          }))}
+        />
+      ),
+    },
+    {
+      key: "docs",
+      title: "Google Docs",
+      node: <DocsWidget docs={docs} error={docsError} />,
+    },
+  ];
+
   return (
     <div className="min-h-screen">
       <Header name={firstName} greeting={greetingFor(new Date())} />
@@ -258,90 +376,11 @@ export default async function DashboardPage() {
         <AffirmationBlock date={new Date()} />
         <SuggestionsPanel suggestions={suggestions} engine={engine} />
 
-        <div className="grid gap-5 lg:grid-cols-3">
-          {/* Column 1 — what's coming at me */}
-          <div className="space-y-5">
-            <EmailsWidget
-              emails={emails.map((e) => ({
-                id: e.id,
-                fromName: e.fromName,
-                subject: e.subject,
-                snippet: e.snippet,
-                date: e.date,
-                starred: e.starred,
-                important: e.important,
-                action: e.action,
-                threadCount: e.threadCount,
-                link: e.link,
-              }))}
-              error={emailError}
-            />
-            <WaitingWidget
-              items={waiting.map((e) => ({
-                id: e.id,
-                fromName: e.fromName,
-                subject: e.subject,
-                date: e.date,
-                link: e.link,
-              }))}
-              error={emailError}
-            />
-            <RemindersWidget
-              reminders={reminders.map((r) => ({
-                id: r.id,
-                title: r.title,
-                category: r.category,
-                dueDate: r.dueDate ? r.dueDate.toISOString() : null,
-                recurrence: r.recurrence,
-                done: r.done,
-              }))}
-            />
-          </div>
-
-          {/* Column 2 — people */}
-          <div className="space-y-5">
-            <SessionsWidget
-              items={sessionActions}
-              studentCount={studentCount}
-              error={
-                !accessToken || authError
-                  ? "Google access expired. Sign out and back in to reconnect."
-                  : null
-              }
-            />
-            <DocsWidget docs={docs} error={docsError} />
-          </div>
-
-          {/* Column 3 — my work: to-do + ideas */}
-          <div className="space-y-5">
-            <ToDoWidget
-              items={todos.map((t) => ({
-                key: t.key,
-                title: t.title,
-                student: t.student,
-                subtitle: t.subtitle,
-                sources: t.sources,
-                starred: t.starred,
-                stageName: t.stageName,
-                badge: t.badge,
-                kind: t.kind,
-                emailLink: t.emailLink,
-                pipelineLink: t.pipelineLink,
-              }))}
-              error={schedulingError}
-            />
-            <IdeasWidget
-              ideas={ideas.map((i) => ({
-                id: i.id,
-                title: i.title,
-                details: i.details,
-                kind: i.kind,
-                status: i.status,
-                priority: i.priority,
-              }))}
-            />
-          </div>
-        </div>
+        <CustomizableGrid
+          items={widgetItems}
+          savedOrder={prefs.order}
+          savedHidden={prefs.hidden}
+        />
 
         <footer className="pt-2 text-center text-xs text-stone-400">
           Wildewood Education · Operations dashboard · refreshes on load
