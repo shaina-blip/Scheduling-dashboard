@@ -9,7 +9,7 @@ function LoginInner() {
   const error = params.get("error");
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-700 to-brand-900 p-6">
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-200 via-brand-100 to-brand-50 p-6">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-8 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -21,8 +21,8 @@ function LoginInner() {
           COO Dashboard
         </h1>
         <p className="mt-2 text-sm text-stone-500">
-          Your morning command center — emails, schedules, students, ideas,
-          reminders, and KPIs in one place.
+          Your morning command center — emails, scheduling, sessions, ideas,
+          and reminders in one place.
         </p>
 
         {error && (
