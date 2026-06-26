@@ -60,4 +60,13 @@ export interface DashboardSnapshot {
     staleActive: { title: string; days: number }[];
     parkedCount: number;
   };
+  sessions: {
+    notesOverdue: number; // past sessions whose notes are 3+ days late
+    notesDue: number; // past sessions still needing notes (not yet overdue)
+    attendanceDue: number; // past sessions not marked attended
+  };
+  waiting: {
+    stale: number; // @Waiting items 5+ days old (worth a nudge)
+    total: number;
+  };
 }

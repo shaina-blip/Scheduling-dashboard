@@ -136,6 +136,10 @@ export async function buildSnapshot(
   userEmail: string,
   emails: { from: string; fromName: string; date: string }[],
   pendingSchedulingCount: number,
+  extra?: {
+    sessions?: { notesOverdue: number; notesDue: number; attendanceDue: number };
+    waiting?: { stale: number; total: number };
+  },
   now = new Date(),
 ): Promise<DashboardSnapshot> {
   const [students, schedule, reminders, kpis, ideas, sessions] =
@@ -268,5 +272,11 @@ export async function buildSnapshot(
     reminders: { overdue, dueSoon, inventoryDue },
     kpis: { offTarget },
     projects: { staleActive, parkedCount },
+    sessions: extra?.sessions ?? {
+      notesOverdue: 0,
+      notesDue: 0,
+      attendanceDue: 0,
+    },
+    waiting: extra?.waiting ?? { stale: 0, total: 0 },
   };
 }

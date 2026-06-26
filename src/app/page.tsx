@@ -224,11 +224,27 @@ export default async function DashboardPage() {
       new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime(),
   );
 
+  // --- Summaries for the smarter suggestion engine ------------------------
+  const sessionsSummary = {
+    notesOverdue: sessionActions.filter((a) => a.needsNotes && a.notesOverdue)
+      .length,
+    notesDue: sessionActions.filter((a) => a.needsNotes && !a.notesOverdue)
+      .length,
+    attendanceDue: sessionActions.filter((a) => a.needsAttendance).length,
+  };
+  const waitingSummary = {
+    total: waiting.length,
+    stale: waiting.filter(
+      (e) => differenceInCalendarDays(todayDate, new Date(e.date)) >= 5,
+    ).length,
+  };
+
   // --- Suggestion engine (scheduling count only, so the nudge stays accurate)
   const snapshot = await buildSnapshot(
     userEmail,
     emails.map((e) => ({ from: e.from, fromName: e.fromName, date: e.date })),
     schedulingTodos.length,
+    { sessions: sessionsSummary, waiting: waitingSummary },
   );
   const { suggestions, engine } = await getSuggestions(snapshot);
 
