@@ -146,6 +146,61 @@ export function generateLocalSuggestions(s: DashboardSnapshot): Suggestion[] {
     });
   }
 
+  // --- Sessions: notes & attendance ----------------------------------------
+  if (s.sessions.notesOverdue > 0) {
+    add({
+      title: `${plural(s.sessions.notesOverdue, "session")} with notes overdue`,
+      detail:
+        "These are 3+ days past the session and the tutoring notes still aren't updated. Knock them out before the details fade.",
+      severity: "urgent",
+      category: "Students",
+      actionLabel: "My sessions",
+      actionHref: "/#sessions",
+      score: 88 + s.sessions.notesOverdue * 4,
+    });
+  }
+  if (s.sessions.notesDue > 0) {
+    add({
+      title: `Write notes for ${plural(s.sessions.notesDue, "recent session")}`,
+      detail:
+        "Log your tutoring notes while the session is fresh — they clear automatically once Drive sees your edit.",
+      severity: "attention",
+      category: "Students",
+      actionLabel: "My sessions",
+      actionHref: "/#sessions",
+      score: 58 + s.sessions.notesDue * 2,
+    });
+  }
+  if (s.sessions.attendanceDue > 0) {
+    add({
+      title: `Mark attendance for ${plural(
+        s.sessions.attendanceDue,
+        "session",
+      )}`,
+      detail:
+        "These past sessions are still marked 'Scheduled' in TeachWorks — mark them attended so billing and records stay clean.",
+      severity: "attention",
+      category: "Students",
+      actionLabel: "My sessions",
+      actionHref: "/#sessions",
+      score: 52 + s.sessions.attendanceDue * 2,
+    });
+  }
+
+  // --- Waiting on others ---------------------------------------------------
+  if (s.waiting.stale > 0) {
+    add({
+      title: `${plural(s.waiting.stale, "person", "people")} you're waiting on (5+ days)`,
+      detail:
+        "It's been a while since you flagged these as @waiting — a gentle nudge might move them along.",
+      severity: "info",
+      category: "Email",
+      actionLabel: "Waiting On",
+      actionHref: "/#waiting",
+      score: 42 + s.waiting.stale * 3,
+    });
+  }
+
   // --- Projects / parking lot ----------------------------------------------
   for (const p of s.projects.staleActive) {
     add({
