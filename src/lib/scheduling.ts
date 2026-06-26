@@ -3,14 +3,16 @@ import type { EmailItem } from "./google";
 
 // Unified scheduling to-do item, merged from the pipeline + Gmail with dedupe.
 export interface ScheduleTodo {
-  key: string; // stable id for persistence: "fam:<id>" or "thread:<threadId>"
+  key: string; // stable id for persistence: "fam:<id>" | "thread:<id>" | "action:<id>"
   title: string; // family / parent name (the person emailed)
   student: string | null; // who it's about
-  subtitle: string; // program · stage  OR  email subject
+  subtitle: string; // program · stage  OR  email subject/summary
   sources: ("pipeline" | "gmail")[];
   date: string | null; // most recent email date, if any
   starred: boolean;
   stageName: string | null;
+  badge: string | null; // small pill: stage name, or "Action"
+  kind: "scheduling" | "action";
   emailLink: string | null;
   pipelineLink: string | null;
 }
@@ -155,6 +157,8 @@ export function mergeScheduling(
       date: best?.date ?? null,
       starred: best?.starred ?? false,
       stageName: fam.stageName,
+      badge: fam.stageName || null,
+      kind: "scheduling",
       emailLink: best?.link ?? null,
       pipelineLink: PIPELINE_URL,
     });
@@ -171,6 +175,8 @@ export function mergeScheduling(
       date: e.date,
       starred: e.starred,
       stageName: null,
+      badge: null,
+      kind: "scheduling",
       emailLink: e.link,
       pipelineLink: null,
     });
@@ -183,4 +189,24 @@ export function mergeScheduling(
       new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime() ||
       a.title.localeCompare(b.title),
   );
+}
+
+/** Turn @Action emails into to-do items for the consolidated To-Do card. */
+export function actionEmailsToTodos(emails: EmailItem[]): ScheduleTodo[] {
+  return emails
+    .filter((e) => e.action)
+    .map((e) => ({
+      key: `action:${e.threadId}`,
+      title: e.fromName,
+      student: null,
+      subtitle: summarizeEmail(e),
+      sources: ["gmail"] as ("pipeline" | "gmail")[],
+      date: e.date,
+      starred: e.starred,
+      stageName: null,
+      badge: "Action",
+      kind: "action" as const,
+      emailLink: e.link,
+      pipelineLink: null,
+    }));
 }

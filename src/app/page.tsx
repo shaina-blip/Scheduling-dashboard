@@ -23,7 +23,7 @@ import {
 } from "@/lib/data";
 import { sessionEndUtc } from "@/lib/time";
 import { fetchPipelineFamilies } from "@/lib/pipeline";
-import { mergeScheduling } from "@/lib/scheduling";
+import { mergeScheduling, actionEmailsToTodos } from "@/lib/scheduling";
 import { getSuggestions } from "@/lib/ai";
 
 import Header from "@/components/Header";
@@ -203,10 +203,10 @@ export default async function DashboardPage() {
         new Date(b.date).getTime() - new Date(a.date).getTime(),
     );
 
-  // --- Merge pipeline + Gmail into one deduped to-do list, then apply the
-  // saved done/ignore/snooze state ----------------------------------------
+  // --- Build the consolidated To-Do: pending scheduling (pipeline + Gmail) +
+  // @Action emails. Then apply saved done/ignore/snooze state. -------------
   const now = Date.now();
-  const todos = mergeScheduling(families, scheduling).filter((t) => {
+  const visible = (t: { key: string }) => {
     const st = todoStates.get(t.key);
     if (!st || st.status === "open") return true;
     if (st.status === "done" || st.status === "ignored") return false;
@@ -214,13 +214,21 @@ export default async function DashboardPage() {
       return st.snoozeUntil ? st.snoozeUntil.getTime() <= now : true;
     }
     return true;
-  });
+  };
 
-  // --- Suggestion engine ---------------------------------------------------
+  const schedulingTodos = mergeScheduling(families, scheduling).filter(visible);
+  const actionTodos = actionEmailsToTodos(emails).filter(visible);
+  const todos = [...schedulingTodos, ...actionTodos].sort(
+    (a, b) =>
+      Number(b.starred) - Number(a.starred) ||
+      new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime(),
+  );
+
+  // --- Suggestion engine (scheduling count only, so the nudge stays accurate)
   const snapshot = await buildSnapshot(
     userEmail,
     emails.map((e) => ({ from: e.from, fromName: e.fromName, date: e.date })),
-    todos.length,
+    schedulingTodos.length,
   );
   const { suggestions, engine } = await getSuggestions(snapshot);
 
@@ -299,6 +307,8 @@ export default async function DashboardPage() {
                 sources: t.sources,
                 starred: t.starred,
                 stageName: t.stageName,
+                badge: t.badge,
+                kind: t.kind,
                 emailLink: t.emailLink,
                 pipelineLink: t.pipelineLink,
               }))}
