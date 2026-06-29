@@ -334,12 +334,15 @@ function addDirectionsBox(sheet) {
   sheet.setColumnWidth(9, 24);
   for (var c = startCol; c <= endCol; c++) sheet.setColumnWidth(c, 150);
 
+  // Title (row 1, aligns with section headers)
   sheet.getRange(1, startCol, 1, width).merge()
     .setValue('📋  How to Fill This Out')
     .setBackground(C.forestGreen).setFontColor(C.white)
     .setFontWeight('bold').setFontSize(13).setHorizontalAlignment('center')
     .setVerticalAlignment('middle');
 
+  // Body — vertical merge across rows 2–14 so the answer-grid rows stay short.
+  var dirTop = 2, dirBot = 14;
   var directions =
     '⚠  Before you start: find a quiet space, silence your phone, and use a timer for each section (see the chart below). Take the test in one sitting if you can.\n\n' +
     '1.  Type ONE answer per question in the "Answer" column next to each number.\n\n' +
@@ -348,26 +351,23 @@ function addDirectionsBox(sheet) {
     '4.  Skipping one? Leave it blank. Blanks just don\'t earn a point (they\'re not marked wrong).\n\n' +
     '5.  Don\'t type in the gray "Q#" columns — those are just the question numbers.\n\n' +
     '6.  When you\'re done, hit the  Grade My Test  button.\n\n' +
-    '7.  Go to the  Score Report  tab and download it as a PDF\n' +
-    '       (File ▸ Download ▸ PDF).';
+    '7.  Go to the  Score Report  tab and download it as a PDF  (File ▸ Download ▸ PDF).';
 
-  sheet.getRange(2, startCol, 1, width).merge()
+  sheet.getRange(dirTop, startCol, dirBot - dirTop + 1, width).merge()
     .setValue(directions)
     .setBackground('#F2F7EE').setFontColor('#2D2D2D')
     .setFontSize(11).setHorizontalAlignment('left')
     .setVerticalAlignment('top').setWrap(true);
-  sheet.setRowHeight(2, 290);
 
-  sheet.getRange(1, startCol, 2, width)
+  sheet.getRange(1, startCol, dirBot, width)
     .setBorder(true, true, true, true, false, false, C.forestGreen, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
-  // ---- Timing chart ----
-  var tRow = 4;
+  // ---- Timing chart (rows 16+, one chart row per grid row, no height overrides) ----
+  var tRow = 16;
   sheet.getRange(tRow, startCol, 1, width).merge()
     .setValue('⏱  ACT Timing  (Enhanced 2025)')
     .setBackground(C.forestGreen).setFontColor(C.white)
     .setFontWeight('bold').setFontSize(12).setHorizontalAlignment('center');
-  sheet.setRowHeight(tRow, 28);
 
   var timing = [
     ['Section', '# Q', 'Time'],
@@ -394,7 +394,6 @@ function addDirectionsBox(sheet) {
     else if (isBreak)  rng.setBackground('#FFF4D6').setFontColor('#7A5C00').setFontStyle('italic');
     else if (isTotal)  rng.setBackground('#E8F0E0').setFontColor(C.forestGreen).setFontWeight('bold');
     else               rng.setBackground(i % 2 === 0 ? '#FFFFFF' : '#F7FAF3');
-    sheet.setRowHeight(r, 22);
   });
 
   sheet.getRange(tRow, startCol, timing.length + 1, width)
@@ -404,7 +403,6 @@ function addDirectionsBox(sheet) {
   sheet.getRange(noteRow, startCol, 1, width).merge()
     .setValue('Break comes after Math. Science is optional — set it on the Setup Page tab.')
     .setFontSize(9).setFontColor('#888888').setFontStyle('italic').setWrap(true);
-  sheet.setRowHeight(noteRow, 30);
 }
 
 // ============================================================
