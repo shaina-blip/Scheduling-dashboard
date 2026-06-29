@@ -174,6 +174,9 @@ function setupSheet() {
   // Conditional formatting — invalid entries → orange
   buildConditionalFormatting(ans);
 
+  // Directions box (to the right of the answer grid)
+  addDirectionsBox(ans);
+
   // ---- SCORE REPORT tab ----
   var sr = ss.getSheetByName('Score Report') || ss.insertSheet('Score Report', 1);
   sr.clearContents();
@@ -198,6 +201,49 @@ function setupSheet() {
     '• Use the Wildewood ACT menu → "Grade My Test" to score.\n' +
     '• To add the "Grade My Test" button: Insert → Drawing, create a button shape, click Save, then right-click it → Assign script → type: gradeTest'
   );
+}
+
+// ============================================================
+// DIRECTIONS BOX
+// ============================================================
+
+function addDirectionsBox(sheet) {
+  var startCol = 10; // column J
+  var endCol   = 14; // column N
+  var width    = endCol - startCol + 1;
+
+  // spacer column between grid (H=8) and box (J=10)
+  sheet.setColumnWidth(9, 24);
+  for (var c = startCol; c <= endCol; c++) sheet.setColumnWidth(c, 150);
+
+  // Title
+  sheet.getRange(1, startCol, 1, width).merge()
+    .setValue('📋  How to Fill This Out')
+    .setBackground(C.forestGreen).setFontColor(C.white)
+    .setFontWeight('bold').setFontSize(13).setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+
+  // Body
+  var directions =
+    '1.  Type ONE answer per question in the "Answer" column next to each number.\n\n' +
+    '2.  Use the right letters:\n' +
+    '       • Odd # questions → A  B  C  D   (Math also has E)\n' +
+    '       • Even # questions → F  G  H  J   (Math also has K)\n\n' +
+    '3.  Lowercase is fine — "a" counts the same as "A".\n\n' +
+    '4.  If a box turns ORANGE, that letter isn\'t valid for that question — fix it.\n\n' +
+    '5.  Skipping one? Leave it blank. Blanks just don\'t earn a point (they\'re not marked wrong).\n\n' +
+    '6.  Don\'t type in the gray "Q#" columns — those are just the question numbers.\n\n' +
+    '7.  When you\'re done, click  Wildewood ACT ▸ Grade My Test  (top menu) to see your score.';
+
+  sheet.getRange(2, startCol, 1, width).merge()
+    .setValue(directions)
+    .setBackground('#F2F7EE').setFontColor('#2D2D2D')
+    .setFontSize(11).setHorizontalAlignment('left')
+    .setVerticalAlignment('top').setWrap(true);
+  sheet.setRowHeight(2, 280);
+
+  // Border-ish framing via background already; nudge alignment
+  sheet.getRange(1, startCol, 2, width).setBorder(true, true, true, true, false, false, C.forestGreen, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 }
 
 // ============================================================
