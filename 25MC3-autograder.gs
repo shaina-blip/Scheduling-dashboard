@@ -225,6 +225,7 @@ function addDirectionsBox(sheet) {
 
   // Body
   var directions =
+    '⚠  Before you start: find a quiet space, silence your phone, and use a timer for each section (see the chart below). Take the test in one sitting if you can.\n\n' +
     '1.  Type ONE answer per question in the "Answer" column next to each number.\n\n' +
     '2.  Write the correct letter according to that question\'s answer choices. If you put a "B" when the choices are F G H J, the cell will turn ORANGE — that means fix it.\n\n' +
     '3.  Lowercase is fine — "a" counts the same as "A".\n\n' +
@@ -239,10 +240,69 @@ function addDirectionsBox(sheet) {
     .setBackground('#F2F7EE').setFontColor('#2D2D2D')
     .setFontSize(11).setHorizontalAlignment('left')
     .setVerticalAlignment('top').setWrap(true);
-  sheet.setRowHeight(2, 260);
+  sheet.setRowHeight(2, 290);
 
-  // Border-ish framing via background already; nudge alignment
+  // Border around directions box
   sheet.getRange(1, startCol, 2, width).setBorder(true, true, true, true, false, false, C.forestGreen, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+
+  // ---- Timing chart (below the directions box) ----
+  var tRow = 4; // leave a gap under the directions box
+
+  sheet.getRange(tRow, startCol, 1, width).merge()
+    .setValue('⏱  ACT Timing  (Enhanced 2025)')
+    .setBackground(C.forestGreen).setFontColor(C.white)
+    .setFontWeight('bold').setFontSize(12).setHorizontalAlignment('center');
+  sheet.setRowHeight(tRow, 28);
+
+  // table: Section (J:K) | # Q (L) | Time (M:N)
+  var timing = [
+    ['Section', '# Q', 'Time'],
+    ['English', '50', '35 min'],
+    ['Math', '45', '50 min'],
+    ['☕  BREAK', '—', '10 min'],
+    ['Reading', '36', '40 min'],
+    ['Science (optional)', '40', '40 min'],
+    ['TOTAL (with Science)', '171', '~2 hr 55 min']
+  ];
+
+  timing.forEach(function(rowVals, i) {
+    var r = tRow + 1 + i;
+    var isHeader = (i === 0);
+    var isBreak  = (rowVals[0].indexOf('BREAK') !== -1);
+    var isTotal  = (rowVals[0].indexOf('TOTAL') !== -1);
+
+    // Section name spans J:K
+    sheet.getRange(r, startCol, 1, 2).merge()
+      .setValue(rowVals[0]).setHorizontalAlignment('left');
+    // # Q in L
+    sheet.getRange(r, startCol + 2).setValue(rowVals[1]).setHorizontalAlignment('center');
+    // Time spans M:N
+    sheet.getRange(r, startCol + 3, 1, 2).merge()
+      .setValue(rowVals[2]).setHorizontalAlignment('center');
+
+    var rng = sheet.getRange(r, startCol, 1, width);
+    if (isHeader) {
+      rng.setBackground(C.sage).setFontColor(C.white).setFontWeight('bold');
+    } else if (isBreak) {
+      rng.setBackground('#FFF4D6').setFontColor('#7A5C00').setFontStyle('italic');
+    } else if (isTotal) {
+      rng.setBackground('#E8F0E0').setFontColor(C.forestGreen).setFontWeight('bold');
+    } else {
+      rng.setBackground(i % 2 === 0 ? '#FFFFFF' : '#F7FAF3');
+    }
+    sheet.setRowHeight(r, 22);
+  });
+
+  // Border around timing chart
+  sheet.getRange(tRow, startCol, timing.length + 1, width)
+    .setBorder(true, true, true, true, true, false, '#CCCCCC', SpreadsheetApp.BorderStyle.SOLID);
+
+  // Note under chart
+  var noteRow = tRow + timing.length + 1;
+  sheet.getRange(noteRow, startCol, 1, width).merge()
+    .setValue('Break comes after Math. Science is optional — skip it if your program doesn\'t use it.')
+    .setFontSize(9).setFontColor('#888888').setFontStyle('italic').setWrap(true);
+  sheet.setRowHeight(noteRow, 30);
 }
 
 // ============================================================
