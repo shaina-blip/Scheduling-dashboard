@@ -203,6 +203,7 @@ function setupSheet() {
 
   // ---- ANSWER SHEET tab ----
   var ans = ss.getSheetByName('Answer Sheet') || ss.insertSheet('Answer Sheet');
+  ans.getRange(1, 1, ans.getMaxRows(), ans.getMaxColumns()).breakApart();
   ans.clearContents();
   ans.clearFormats();
   ans.clearConditionalFormatRules();
@@ -275,6 +276,7 @@ function setupSheet() {
 
 function createSetupPage(ss) {
   var sp = ss.getSheetByName(SETUP_TAB) || ss.insertSheet(SETUP_TAB);
+  sp.getRange(1, 1, sp.getMaxRows(), sp.getMaxColumns()).breakApart();
   sp.clearContents();
   sp.clearFormats();
   sp.setColumnWidth(1, 24);
