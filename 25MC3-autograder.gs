@@ -226,21 +226,20 @@ function addDirectionsBox(sheet) {
   // Body
   var directions =
     '1.  Type ONE answer per question in the "Answer" column next to each number.\n\n' +
-    '2.  Use the right letters:\n' +
-    '       • Odd # questions → A  B  C  D   (Math also has E)\n' +
-    '       • Even # questions → F  G  H  J   (Math also has K)\n\n' +
+    '2.  Write the correct letter according to that question\'s answer choices. If you put a "B" when the choices are F G H J, the cell will turn ORANGE — that means fix it.\n\n' +
     '3.  Lowercase is fine — "a" counts the same as "A".\n\n' +
-    '4.  If a box turns ORANGE, that letter isn\'t valid for that question — fix it.\n\n' +
-    '5.  Skipping one? Leave it blank. Blanks just don\'t earn a point (they\'re not marked wrong).\n\n' +
-    '6.  Don\'t type in the gray "Q#" columns — those are just the question numbers.\n\n' +
-    '7.  When you\'re done, click  Wildewood ACT ▸ Grade My Test  (top menu) to see your score.';
+    '4.  Skipping one? Leave it blank. Blanks just don\'t earn a point (they\'re not marked wrong).\n\n' +
+    '5.  Don\'t type in the gray "Q#" columns — those are just the question numbers.\n\n' +
+    '6.  When you\'re done, hit the  Grade My Test  button.\n\n' +
+    '7.  Go to the  Score Report  tab and download it as a PDF\n' +
+    '       (File ▸ Download ▸ PDF).';
 
   sheet.getRange(2, startCol, 1, width).merge()
     .setValue(directions)
     .setBackground('#F2F7EE').setFontColor('#2D2D2D')
     .setFontSize(11).setHorizontalAlignment('left')
     .setVerticalAlignment('top').setWrap(true);
-  sheet.setRowHeight(2, 280);
+  sheet.setRowHeight(2, 260);
 
   // Border-ish framing via background already; nudge alignment
   sheet.getRange(1, startCol, 2, width).setBorder(true, true, true, true, false, false, C.forestGreen, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
