@@ -171,16 +171,7 @@ function setupSheet() {
     ans.setRowHeight(row, 22);
   }
 
-  // Protect everything except answer columns (B, D, F, H)
-  var protection = ans.protect().setDescription('Q# columns locked');
-  protection.setUnprotectedRanges([
-    ans.getRange('B3:B52'),
-    ans.getRange('D3:D47'),
-    ans.getRange('F3:F38'),
-    ans.getRange('H3:H42')
-  ]);
-
-  // Conditional formatting — invalid entries → orange; apply after protecting
+  // Conditional formatting — invalid entries → orange
   buildConditionalFormatting(ans);
 
   // ---- SCORE REPORT tab ----
@@ -215,11 +206,10 @@ function setupSheet() {
 
 function removeAllProtections(ss) {
   ss.getSheets().forEach(function(sheet) {
-    sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE).forEach(function(p) {
-      if (p.canEdit()) p.remove();
-    });
-    sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(function(p) {
-      if (p.canEdit()) p.remove();
+    [SpreadsheetApp.ProtectionType.RANGE, SpreadsheetApp.ProtectionType.SHEET].forEach(function(type) {
+      sheet.getProtections(type).forEach(function(p) {
+        try { p.remove(); } catch (e) { /* not removable by this account; ignore */ }
+      });
     });
   });
 }
