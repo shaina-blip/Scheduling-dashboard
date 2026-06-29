@@ -97,6 +97,9 @@ function onOpen() {
 function setupSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
+  // ---- Remove any leftover protections from a previous run ----
+  removeAllProtections(ss);
+
   // ---- ANSWER_KEY tab (hidden) ----
   var akSheet = ss.getSheetByName('ANSWER_KEY') || ss.insertSheet('ANSWER_KEY');
   akSheet.clearContents();
@@ -204,6 +207,21 @@ function setupSheet() {
     '• Use the Wildewood ACT menu → "Grade My Test" to score.\n' +
     '• To add the "Grade My Test" button: Insert → Drawing, create a button shape, click Save, then right-click it → Assign script → type: gradeTest'
   );
+}
+
+// ============================================================
+// REMOVE PROTECTIONS (clears locks from prior runs)
+// ============================================================
+
+function removeAllProtections(ss) {
+  ss.getSheets().forEach(function(sheet) {
+    sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE).forEach(function(p) {
+      if (p.canEdit()) p.remove();
+    });
+    sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(function(p) {
+      if (p.canEdit()) p.remove();
+    });
+  });
 }
 
 // ============================================================
