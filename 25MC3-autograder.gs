@@ -1,5 +1,4 @@
 // ACT Form 25MC3 Autograder — Wildewood Education
-// Paste this entire file into Tools > Script Editor in your Google Sheet
 
 // ============================================================
 // ANSWER KEYS
@@ -49,6 +48,34 @@ var ANSWER_KEYS = {
 };
 
 // ============================================================
+// QUESTION CATEGORIES (official ACT reporting categories)
+// Filled by classification; report shows a breakdown when present.
+// ============================================================
+
+var CATEGORY_LABELS = {
+  POW:'Production of Writing', KLA:'Knowledge of Language', CSE:'Conventions of Standard English',
+  PHM:'Preparing for Higher Math', IES:'Integrating Essential Skills', MDL:'Modeling',
+  KID:'Key Ideas & Details', CS:'Craft & Structure', IKI:'Integration of Knowledge & Ideas',
+  IOD:'Interpretation of Data', SIN:'Scientific Investigation', EMI:'Evaluation of Models, Inferences & Results'
+};
+
+// Order in which categories appear per section
+var CATEGORY_ORDER = {
+  english: ['CSE','POW','KLA'],
+  math:    ['PHM','IES','MDL'],
+  reading: ['KID','CS','IKI'],
+  science: ['IOD','SIN','EMI']
+};
+
+// Per-question category map (populated by classifier).
+var QUESTION_CATEGORIES = {
+  english: {},
+  math: {},
+  reading: {},
+  science: {}
+};
+
+// ============================================================
 // RAW → SCALED CONVERSION TABLES (index = raw score)
 // ============================================================
 
@@ -60,20 +87,24 @@ var SCORE_TABLES = {
 };
 
 // ============================================================
-// COLORS
+// COLORS & SETUP-PAGE CONFIG
 // ============================================================
 
 var C = {
   forestGreen: '#2D5016',
   sage:        '#8AAD6E',
   white:       '#FFFFFF',
-  lightGray:   '#F5F5F5',
   red:         '#CC0000',
   lightRed:    '#FFEBEE',
   lightGreen:  '#E8F5E9',
   rowAlt:      '#F2F7EE',
   subhead:     '#F0F0F0'
 };
+
+var SETUP_TAB    = 'Setup Page';
+var NAME_CELL    = 'C4';
+var DATE_CELL    = 'C5';
+var SCIENCE_CELL = 'C6'; // checkbox: TRUE = taking Science
 
 // ============================================================
 // MENU
@@ -90,75 +121,93 @@ function onOpen() {
     .addToUi();
 }
 
+// Auto-adjust the Answer Sheet when the Science checkbox is toggled.
+function onEdit(e) {
+  if (!e || !e.range) return;
+  var sh = e.range.getSheet();
+  if (sh.getName() !== SETUP_TAB) return;
+  if (e.range.getA1Notation() !== SCIENCE_CELL) return;
+  applyVersion(e.range.getValue() === true);
+}
+
+function applyVersion(includeScience) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ans = ss.getSheetByName('Answer Sheet');
+  if (!ans) return;
+  if (includeScience) ans.showColumns(7, 2);   // columns G, H
+  else ans.hideColumns(7, 2);
+}
+
+function getSettings() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sp = ss.getSheetByName(SETUP_TAB);
+  if (!sp) return { name:'', date:'', science:true };
+  var sci = sp.getRange(SCIENCE_CELL).getValue();
+  return {
+    name: sp.getRange(NAME_CELL).getValue(),
+    date: sp.getRange(DATE_CELL).getValue(),
+    science: sci === true || sci === 'TRUE'
+  };
+}
+
 // ============================================================
 // SETUP SHEET
 // ============================================================
 
 function setupSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  // ---- Remove any leftover protections from a previous run ----
   removeAllProtections(ss);
 
   // ---- ANSWER_KEY tab (hidden) ----
   var akSheet = ss.getSheetByName('ANSWER_KEY') || ss.insertSheet('ANSWER_KEY');
   akSheet.clearContents();
-  var akData = [['Section','Question','Correct Answer','Scored']];
+  var akData = [['Section','Question','Correct Answer','Category','Scored']];
   ['english','math','reading','science'].forEach(function(sec) {
     var key = ANSWER_KEYS[sec];
     for (var q = 1; q <= key.total; q++) {
       akData.push([
-        sec.charAt(0).toUpperCase() + sec.slice(1),
-        q,
+        sec.charAt(0).toUpperCase() + sec.slice(1), q,
         key.answers[q] || '',
+        (QUESTION_CATEGORIES[sec] && QUESTION_CATEGORIES[sec][q]) || '',
         key.notScored.indexOf(q) === -1 ? 'Yes' : 'No'
       ]);
     }
   });
-  akSheet.getRange(1, 1, akData.length, 4).setValues(akData);
+  akSheet.getRange(1, 1, akData.length, 5).setValues(akData);
   akSheet.hideSheet();
 
+  // ---- SETUP PAGE tab ----
+  createSetupPage(ss);
+
   // ---- ANSWER SHEET tab ----
-  var ans = ss.getSheetByName('Answer Sheet') || ss.insertSheet('Answer Sheet', 0);
+  var ans = ss.getSheetByName('Answer Sheet') || ss.insertSheet('Answer Sheet');
   ans.clearContents();
   ans.clearFormats();
   ans.clearConditionalFormatRules();
+  ans.showColumns(7, 2);
 
-  // Column widths: A-H, no spacers per spec
   [1,2,3,4,5,6,7,8].forEach(function(col) {
     ans.setColumnWidth(col, col % 2 === 1 ? 48 : 90);
   });
 
-  // Section headers row 1 (merged pairs)
   var sectionLabels = ['ENGLISH','MATH','READING','SCIENCE'];
-  var sectionCols   = [1, 3, 5, 7]; // A, C, E, G
+  var sectionCols   = [1, 3, 5, 7];
   sectionLabels.forEach(function(label, i) {
-    var col = sectionCols[i];
-    ans.getRange(1, col, 1, 2).merge()
-      .setValue(label)
-      .setBackground(C.forestGreen)
-      .setFontColor(C.white)
-      .setFontWeight('bold')
-      .setFontSize(11)
-      .setHorizontalAlignment('center');
+    ans.getRange(1, sectionCols[i], 1, 2).merge()
+      .setValue(label).setBackground(C.forestGreen).setFontColor(C.white)
+      .setFontWeight('bold').setFontSize(11).setHorizontalAlignment('center');
   });
   ans.setRowHeight(1, 32);
 
-  // Sub-headers row 2
-  var subCols = [1,2,3,4,5,6,7,8];
   var subLabels = ['Q#','Answer','Q#','Answer','Q#','Answer','Q#','Answer'];
-  subCols.forEach(function(col, i) {
-    ans.getRange(2, col)
-      .setValue(subLabels[i])
-      .setBackground(C.sage)
-      .setFontColor(C.white)
-      .setFontWeight('bold')
-      .setHorizontalAlignment('center');
+  [1,2,3,4,5,6,7,8].forEach(function(col, i) {
+    ans.getRange(2, col).setValue(subLabels[i])
+      .setBackground(C.sage).setFontColor(C.white)
+      .setFontWeight('bold').setHorizontalAlignment('center');
   });
   ans.setRowHeight(2, 26);
 
-  // Question rows (3–52, max for English=50)
-  var totals = [50, 45, 36, 40]; // english, math, reading, science
+  var totals = [50, 45, 36, 40];
   for (var i = 1; i <= 50; i++) {
     var row = i + 2;
     var bg = (i % 2 === 0) ? C.rowAlt : C.white;
@@ -171,40 +220,88 @@ function setupSheet() {
     ans.setRowHeight(row, 22);
   }
 
-  // Conditional formatting — invalid entries → orange
   buildConditionalFormatting(ans);
-
-  // Directions box (to the right of the answer grid)
   addDirectionsBox(ans);
 
   // ---- SCORE REPORT tab ----
-  var sr = ss.getSheetByName('Score Report') || ss.insertSheet('Score Report', 1);
-  sr.clearContents();
-  sr.clearFormats();
-  sr.getRange('A1:F1').merge()
-    .setValue('Wildewood Education — ACT Score Report')
-    .setBackground(C.forestGreen).setFontColor(C.white).setFontWeight('bold').setFontSize(16).setHorizontalAlignment('center');
-  sr.getRange('A2:F2').merge()
-    .setValue('Run "Grade My Test" to generate your score report.')
-    .setBackground(C.sage).setFontColor(C.white).setFontSize(10).setHorizontalAlignment('center');
-  sr.setRowHeight(1, 50);
-  sr.setRowHeight(2, 28);
+  var sr = ss.getSheetByName('Score Report') || ss.insertSheet('Score Report');
+  resetScoreReport(sr);
   [180,120,180,100,100,100].forEach(function(w, i) { sr.setColumnWidth(i+1, w); });
 
-  // Reorder: Answer Sheet first, Score Report second, ANSWER_KEY last
-  ss.setActiveSheet(ans);
-  ss.moveActiveSheet(1);
+  // ---- Order tabs: Setup Page, Answer Sheet, Score Report ----
+  ss.setActiveSheet(ss.getSheetByName(SETUP_TAB)); ss.moveActiveSheet(1);
+  ss.setActiveSheet(ans); ss.moveActiveSheet(2);
+  ss.setActiveSheet(sr); ss.moveActiveSheet(3);
 
+  // Apply current version selection
+  applyVersion(getSettings().science);
+
+  ss.setActiveSheet(ss.getSheetByName(SETUP_TAB));
   SpreadsheetApp.getUi().alert(
     'Setup complete!\n\n' +
-    '• Fill in answers on the "Answer Sheet" tab.\n' +
-    '• Use the Wildewood ACT menu → "Grade My Test" to score.\n' +
-    '• To add the "Grade My Test" button: Insert → Drawing, create a button shape, click Save, then right-click it → Assign script → type: gradeTest'
+    '1. On the "Setup Page" tab, enter the student name and choose whether Science is included.\n' +
+    '2. Fill in answers on the "Answer Sheet" tab.\n' +
+    '3. Click  Wildewood ACT ▸ Grade My Test  (or the button) to score.\n' +
+    '4. Open the "Score Report" tab and download as PDF.\n\n' +
+    'Button: Insert ▸ Drawing → make a button → Save → right-click → Assign script → gradeTest'
   );
 }
 
 // ============================================================
-// DIRECTIONS BOX
+// SETUP PAGE
+// ============================================================
+
+function createSetupPage(ss) {
+  var sp = ss.getSheetByName(SETUP_TAB) || ss.insertSheet(SETUP_TAB);
+  sp.clearContents();
+  sp.clearFormats();
+  sp.setColumnWidth(1, 24);
+  sp.setColumnWidth(2, 190);
+  sp.setColumnWidth(3, 220);
+  sp.setColumnWidth(4, 24);
+
+  // Title
+  sp.getRange('B2:C2').merge()
+    .setValue('Wildewood Education — ACT Setup')
+    .setBackground(C.forestGreen).setFontColor(C.white)
+    .setFontWeight('bold').setFontSize(15).setHorizontalAlignment('center');
+  sp.setRowHeight(2, 40);
+
+  // Fields
+  sp.getRange('B4').setValue('Student Name:').setFontWeight('bold').setHorizontalAlignment('right');
+  sp.getRange(NAME_CELL).setBackground('#FFFDE7').setBorder(true,true,true,true,false,false);
+
+  sp.getRange('B5').setValue('Test Date:').setFontWeight('bold').setHorizontalAlignment('right');
+  sp.getRange(DATE_CELL).setBackground('#FFFDE7').setBorder(true,true,true,true,false,false);
+
+  sp.getRange('B6').setValue('Taking the Science section?').setFontWeight('bold').setHorizontalAlignment('right');
+  sp.getRange(SCIENCE_CELL).insertCheckboxes();
+  sp.getRange(SCIENCE_CELL).setValue(true);
+
+  [4,5,6].forEach(function(r){ sp.setRowHeight(r, 28); });
+
+  // Helper note
+  sp.getRange('B8:C12').merge()
+    .setValue(
+      'How this works:\n\n' +
+      '• Type the student\'s name above — it appears on the Score Report.\n\n' +
+      '• Check the box if you ARE taking the optional Science section. ' +
+      'Uncheck it to take the core test only (English, Math, Reading).\n\n' +
+      '• Toggling the box automatically shows or hides the Science columns ' +
+      'on the Answer Sheet.\n\n' +
+      'Note: Your Composite is the average of English, Math, and Reading. ' +
+      'Science is reported separately (plus a STEM score with Math).')
+    .setBackground(C.rowAlt).setFontColor('#2D2D2D').setFontSize(11)
+    .setVerticalAlignment('top').setWrap(true)
+    .setBorder(true,true,true,true,false,false, C.sage, SpreadsheetApp.BorderStyle.SOLID);
+  sp.setRowHeight(8, 30);
+
+  // Hide gridlines for a cleaner look
+  sp.setHiddenGridlines(true);
+}
+
+// ============================================================
+// DIRECTIONS BOX (+ timing chart) on the Answer Sheet
 // ============================================================
 
 function addDirectionsBox(sheet) {
@@ -212,18 +309,15 @@ function addDirectionsBox(sheet) {
   var endCol   = 14; // column N
   var width    = endCol - startCol + 1;
 
-  // spacer column between grid (H=8) and box (J=10)
   sheet.setColumnWidth(9, 24);
   for (var c = startCol; c <= endCol; c++) sheet.setColumnWidth(c, 150);
 
-  // Title
   sheet.getRange(1, startCol, 1, width).merge()
     .setValue('📋  How to Fill This Out')
     .setBackground(C.forestGreen).setFontColor(C.white)
     .setFontWeight('bold').setFontSize(13).setHorizontalAlignment('center')
     .setVerticalAlignment('middle');
 
-  // Body
   var directions =
     '⚠  Before you start: find a quiet space, silence your phone, and use a timer for each section (see the chart below). Take the test in one sitting if you can.\n\n' +
     '1.  Type ONE answer per question in the "Answer" column next to each number.\n\n' +
@@ -242,19 +336,17 @@ function addDirectionsBox(sheet) {
     .setVerticalAlignment('top').setWrap(true);
   sheet.setRowHeight(2, 290);
 
-  // Border around directions box
-  sheet.getRange(1, startCol, 2, width).setBorder(true, true, true, true, false, false, C.forestGreen, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  sheet.getRange(1, startCol, 2, width)
+    .setBorder(true, true, true, true, false, false, C.forestGreen, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
-  // ---- Timing chart (below the directions box) ----
-  var tRow = 4; // leave a gap under the directions box
-
+  // ---- Timing chart ----
+  var tRow = 4;
   sheet.getRange(tRow, startCol, 1, width).merge()
     .setValue('⏱  ACT Timing  (Enhanced 2025)')
     .setBackground(C.forestGreen).setFontColor(C.white)
     .setFontWeight('bold').setFontSize(12).setHorizontalAlignment('center');
   sheet.setRowHeight(tRow, 28);
 
-  // table: Section (J:K) | # Q (L) | Time (M:N)
   var timing = [
     ['Section', '# Q', 'Time'],
     ['English', '50', '35 min'],
@@ -271,49 +363,37 @@ function addDirectionsBox(sheet) {
     var isBreak  = (rowVals[0].indexOf('BREAK') !== -1);
     var isTotal  = (rowVals[0].indexOf('TOTAL') !== -1);
 
-    // Section name spans J:K
-    sheet.getRange(r, startCol, 1, 2).merge()
-      .setValue(rowVals[0]).setHorizontalAlignment('left');
-    // # Q in L
+    sheet.getRange(r, startCol, 1, 2).merge().setValue(rowVals[0]).setHorizontalAlignment('left');
     sheet.getRange(r, startCol + 2).setValue(rowVals[1]).setHorizontalAlignment('center');
-    // Time spans M:N
-    sheet.getRange(r, startCol + 3, 1, 2).merge()
-      .setValue(rowVals[2]).setHorizontalAlignment('center');
+    sheet.getRange(r, startCol + 3, 1, 2).merge().setValue(rowVals[2]).setHorizontalAlignment('center');
 
     var rng = sheet.getRange(r, startCol, 1, width);
-    if (isHeader) {
-      rng.setBackground(C.sage).setFontColor(C.white).setFontWeight('bold');
-    } else if (isBreak) {
-      rng.setBackground('#FFF4D6').setFontColor('#7A5C00').setFontStyle('italic');
-    } else if (isTotal) {
-      rng.setBackground('#E8F0E0').setFontColor(C.forestGreen).setFontWeight('bold');
-    } else {
-      rng.setBackground(i % 2 === 0 ? '#FFFFFF' : '#F7FAF3');
-    }
+    if (isHeader)      rng.setBackground(C.sage).setFontColor(C.white).setFontWeight('bold');
+    else if (isBreak)  rng.setBackground('#FFF4D6').setFontColor('#7A5C00').setFontStyle('italic');
+    else if (isTotal)  rng.setBackground('#E8F0E0').setFontColor(C.forestGreen).setFontWeight('bold');
+    else               rng.setBackground(i % 2 === 0 ? '#FFFFFF' : '#F7FAF3');
     sheet.setRowHeight(r, 22);
   });
 
-  // Border around timing chart
   sheet.getRange(tRow, startCol, timing.length + 1, width)
     .setBorder(true, true, true, true, true, false, '#CCCCCC', SpreadsheetApp.BorderStyle.SOLID);
 
-  // Note under chart
   var noteRow = tRow + timing.length + 1;
   sheet.getRange(noteRow, startCol, 1, width).merge()
-    .setValue('Break comes after Math. Science is optional — skip it if your program doesn\'t use it.')
+    .setValue('Break comes after Math. Science is optional — set it on the Setup Page tab.')
     .setFontSize(9).setFontColor('#888888').setFontStyle('italic').setWrap(true);
   sheet.setRowHeight(noteRow, 30);
 }
 
 // ============================================================
-// REMOVE PROTECTIONS (clears locks from prior runs)
+// REMOVE PROTECTIONS
 // ============================================================
 
 function removeAllProtections(ss) {
   ss.getSheets().forEach(function(sheet) {
     [SpreadsheetApp.ProtectionType.RANGE, SpreadsheetApp.ProtectionType.SHEET].forEach(function(type) {
       sheet.getProtections(type).forEach(function(p) {
-        try { p.remove(); } catch (e) { /* not removable by this account; ignore */ }
+        try { p.remove(); } catch (e) {}
       });
     });
   });
@@ -325,38 +405,25 @@ function removeAllProtections(ss) {
 
 function buildConditionalFormatting(sheet) {
   var rules = [];
-
-  // [answerCol, startRow, endRow, ismath]
   var cols = [
     {col:'B', r1:3, r2:52, math:false},
     {col:'D', r1:3, r2:47, math:true},
     {col:'F', r1:3, r2:38, math:false},
     {col:'H', r1:3, r2:42, math:false}
   ];
-
   cols.forEach(function(c) {
     var rng = sheet.getRange(c.col + c.r1 + ':' + c.col + c.r2);
     var oddValid  = c.math ? '"A","B","C","D","E"' : '"A","B","C","D"';
     var evenValid = c.math ? '"F","G","H","J","K"' : '"F","G","H","J"';
-
-    // Odd questions (Q# odd → row number odd when offset by 2, i.e. row 3=Q1, row 5=Q3...)
-    // Row - 2 = Q#; Q# is odd when ROW()-2 is odd → MOD(ROW(),2)=1
     var oddFormula  = '=AND(' + c.col + c.r1 + '<>"",MOD(ROW()-2,2)=1,NOT(OR(' +
       oddValid.split(',').map(function(v){ return 'UPPER('+c.col+c.r1+')='+v; }).join(',') + ')))';
     var evenFormula = '=AND(' + c.col + c.r1 + '<>"",MOD(ROW()-2,2)=0,NOT(OR(' +
       evenValid.split(',').map(function(v){ return 'UPPER('+c.col+c.r1+')='+v; }).join(',') + ')))';
-
-    rules.push(SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(oddFormula)
-      .setBackground('#FF6600').setFontColor(C.white)
-      .setRanges([rng]).build());
-
-    rules.push(SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(evenFormula)
-      .setBackground('#FF6600').setFontColor(C.white)
-      .setRanges([rng]).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(oddFormula)
+      .setBackground('#FF6600').setFontColor(C.white).setRanges([rng]).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(evenFormula)
+      .setBackground('#FF6600').setFontColor(C.white).setRanges([rng]).build());
   });
-
   sheet.setConditionalFormatRules(rules);
 }
 
@@ -368,123 +435,134 @@ function gradeTest() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ans = ss.getSheetByName('Answer Sheet');
   var sr  = ss.getSheetByName('Score Report');
+  if (!ans || !sr) { SpreadsheetApp.getUi().alert('Missing sheets. Run Setup Sheet first.'); return; }
 
-  if (!ans || !sr) {
-    SpreadsheetApp.getUi().alert('Missing sheets. Run Setup Sheet first.');
-    return;
-  }
+  var settings = getSettings();
+  var includeScience = settings.science;
 
-  var studentAnswers = {
-    english: ans.getRange('B3:B52').getValues().map(function(r){ return r[0]; }),
-    math:    ans.getRange('D3:D47').getValues().map(function(r){ return r[0]; }),
-    reading: ans.getRange('F3:F38').getValues().map(function(r){ return r[0]; }),
-    science: ans.getRange('H3:H42').getValues().map(function(r){ return r[0]; })
+  var ranges = {
+    english: 'B3:B52', math: 'D3:D47', reading: 'F3:F38', science: 'H3:H42'
   };
 
+  var sections = ['english','math','reading'];
+  if (includeScience) sections.push('science');
+
   var results = {};
-  ['english','math','reading','science'].forEach(function(sec) {
-    results[sec] = gradeSection(sec, studentAnswers[sec]);
+  sections.forEach(function(sec) {
+    var vals = ans.getRange(ranges[sec]).getValues().map(function(r){ return r[0]; });
+    results[sec] = gradeSection(sec, vals);
     results[sec].scaled = rawToScaled(sec, results[sec].raw);
   });
 
-  var composite = Math.round(
-    (results.english.scaled + results.math.scaled + results.reading.scaled + results.science.scaled) / 4
-  );
+  var composite = Math.round((results.english.scaled + results.math.scaled + results.reading.scaled) / 3);
+  var stem = includeScience ? Math.round((results.math.scaled + results.science.scaled) / 2) : null;
 
-  buildScoreReport(sr, results, composite);
+  buildScoreReport(sr, results, composite, stem, settings, includeScience);
   ss.setActiveSheet(sr);
 }
 
 function gradeSection(section, studentAnswers) {
   var key    = ANSWER_KEYS[section];
-  var missed = [];
-  var blanks = [];
-  var raw    = 0;
+  var catMap = QUESTION_CATEGORIES[section] || {};
+  var missed = [], blanks = [], raw = 0;
+  var catTally = {}; // code -> {correct, total}
 
   for (var i = 0; i < key.total; i++) {
-    var qNum    = i + 1;
-    var scored  = key.notScored.indexOf(qNum) === -1;
-    if (!scored) continue;
+    var qNum = i + 1;
+    if (key.notScored.indexOf(qNum) !== -1) continue;
 
     var student = studentAnswers[i] ? String(studentAnswers[i]).trim().toUpperCase() : '';
     var correct = key.answers[qNum] ? key.answers[qNum].toUpperCase() : '';
+    var isCorrect = (student !== '' && student === correct);
 
-    if (student === '') {
-      blanks.push(qNum);
-    } else if (student === correct) {
-      raw++;
-    } else {
-      missed.push({ q: qNum, student: student, correct: correct });
+    if (student === '') blanks.push(qNum);
+    else if (isCorrect) raw++;
+    else missed.push({ q: qNum, student: student, correct: correct });
+
+    var cat = catMap[qNum];
+    if (cat) {
+      if (!catTally[cat]) catTally[cat] = { correct: 0, total: 0 };
+      catTally[cat].total++;
+      if (isCorrect) catTally[cat].correct++;
     }
   }
-
-  return { raw: raw, missed: missed, blanks: blanks };
+  return { raw: raw, missed: missed, blanks: blanks, catTally: catTally };
 }
 
 function rawToScaled(section, raw) {
   var table = SCORE_TABLES[section];
-  var idx   = Math.max(0, Math.min(raw, table.length - 1));
-  return table[idx];
+  return table[Math.max(0, Math.min(raw, table.length - 1))];
 }
 
 // ============================================================
-// BUILD SCORE REPORT
+// SCORE REPORT
 // ============================================================
 
-function buildScoreReport(sheet, results, composite) {
+function resetScoreReport(sheet) {
   sheet.clearContents();
   sheet.clearFormats();
+  sheet.getRange('A1:F1').merge()
+    .setValue('Wildewood Education — ACT Score Report')
+    .setBackground(C.forestGreen).setFontColor(C.white).setFontWeight('bold').setFontSize(16).setHorizontalAlignment('center');
+  sheet.getRange('A2:F2').merge()
+    .setValue('Run "Grade My Test" to generate your score report.')
+    .setBackground(C.sage).setFontColor(C.white).setFontSize(10).setHorizontalAlignment('center');
+  sheet.setRowHeight(1, 50);
+  sheet.setRowHeight(2, 28);
+}
 
+function buildScoreReport(sheet, results, composite, stem, settings, includeScience) {
+  sheet.clearContents();
+  sheet.clearFormats();
   var row = 1;
 
-  // ---- Header ----
+  // Header
   sheet.getRange(row, 1, 1, 6).merge()
     .setValue('Wildewood Education — ACT Score Report')
-    .setBackground(C.forestGreen).setFontColor(C.white)
-    .setFontWeight('bold').setFontSize(18).setHorizontalAlignment('center');
+    .setBackground(C.forestGreen).setFontColor(C.white).setFontWeight('bold').setFontSize(18).setHorizontalAlignment('center');
   sheet.setRowHeight(row, 50); row++;
 
+  var sub = 'ACT Practice Test  ·  Form 25MC3';
+  if (settings && settings.name) sub = settings.name + '   ·   ' + sub;
+  if (settings && settings.date) sub += '   ·   ' + settings.date;
   sheet.getRange(row, 1, 1, 6).merge()
-    .setValue('ACT Practice Test  ·  Form 25MC3')
-    .setBackground(C.sage).setFontColor(C.white)
-    .setFontSize(11).setHorizontalAlignment('center');
+    .setValue(sub)
+    .setBackground(C.sage).setFontColor(C.white).setFontSize(11).setHorizontalAlignment('center');
   sheet.setRowHeight(row, 30); row++;
+  row++;
 
-  row++; // spacer
-
-  // ---- Composite ----
-  sheet.getRange(row, 1)
-    .setValue('COMPOSITE SCORE')
-    .setFontSize(13).setFontWeight('bold').setFontColor(C.forestGreen);
-  sheet.getRange(row, 2)
-    .setValue(composite)
-    .setFontSize(24).setFontWeight('bold').setFontColor(C.forestGreen).setHorizontalAlignment('center');
-  sheet.getRange(row, 3)
-    .setValue('/ 36')
-    .setFontSize(13).setFontColor('#888888').setVerticalAlignment('middle');
+  // Composite
+  sheet.getRange(row, 1).setValue('COMPOSITE SCORE').setFontSize(13).setFontWeight('bold').setFontColor(C.forestGreen);
+  sheet.getRange(row, 2).setValue(composite).setFontSize(24).setFontWeight('bold').setFontColor(C.forestGreen).setHorizontalAlignment('center');
+  sheet.getRange(row, 3).setValue('/ 36').setFontSize(13).setFontColor('#888888').setVerticalAlignment('middle');
   sheet.setRowHeight(row, 40); row++;
+  sheet.getRange(row, 1, 1, 6).merge()
+    .setValue('Composite = average of English, Math, and Reading (Enhanced ACT).')
+    .setFontSize(9).setFontColor('#888888').setFontStyle('italic');
+  row++;
+  if (includeScience && stem !== null) {
+    sheet.getRange(row, 1).setValue('STEM Score').setFontWeight('bold').setFontColor(C.forestGreen);
+    sheet.getRange(row, 2).setValue(stem).setFontWeight('bold').setHorizontalAlignment('center');
+    sheet.getRange(row, 3, 1, 4).merge().setValue('(average of Math + Science)').setFontSize(9).setFontColor('#888888').setFontStyle('italic');
+    row++;
+  }
+  row++;
 
-  row++; // spacer
-
-  // ---- Section scores table ----
-  var sHdr = ['Section', 'Raw Score', 'Max Raw', 'Scaled Score'];
-  sHdr.forEach(function(h, i) {
-    sheet.getRange(row, i + 1)
-      .setValue(h)
-      .setBackground(C.forestGreen).setFontColor(C.white)
-      .setFontWeight('bold').setHorizontalAlignment('center');
+  // Section scores table
+  ['Section','Raw Score','Max Raw','Scaled Score'].forEach(function(h, i) {
+    sheet.getRange(row, i + 1).setValue(h).setBackground(C.forestGreen).setFontColor(C.white).setFontWeight('bold').setHorizontalAlignment('center');
   });
   row++;
 
   var sectionDefs = [
     {label:'English', key:'english', maxRaw:40},
-    {label:'Math',    key:'math',    maxRaw:41},
+    {label:'Math', key:'math', maxRaw:41},
     {label:'Reading', key:'reading', maxRaw:27},
-    {label:'Science', key:'science', maxRaw:34}
+    {label:'Science (separate)', key:'science', maxRaw:34}
   ];
-
-  sectionDefs.forEach(function(s, idx) {
-    var r  = results[s.key];
+  var shown = sectionDefs.filter(function(s){ return results[s.key]; });
+  shown.forEach(function(s, idx) {
+    var r = results[s.key];
     var bg = idx % 2 === 0 ? '#F8F8F8' : C.white;
     sheet.getRange(row, 1).setValue(s.label).setBackground(bg).setFontWeight('bold');
     sheet.getRange(row, 2).setValue(r.raw).setBackground(bg).setHorizontalAlignment('center');
@@ -492,46 +570,66 @@ function buildScoreReport(sheet, results, composite) {
     sheet.getRange(row, 4).setValue(r.scaled).setBackground(bg).setHorizontalAlignment('center').setFontWeight('bold').setFontSize(12);
     row++;
   });
+  row++;
 
-  row++; // spacer
-
-  // ---- Missed questions per section ----
-  sectionDefs.forEach(function(s) {
-    var r = results[s.key];
-
-    // Section subheader
+  // Category breakdown (only if categories are present)
+  var hasCats = shown.some(function(s){ return Object.keys(results[s.key].catTally || {}).length > 0; });
+  if (hasCats) {
     sheet.getRange(row, 1, 1, 6).merge()
-      .setValue(s.label + '  —  Missed Questions')
-      .setBackground(C.sage).setFontColor(C.white)
-      .setFontWeight('bold').setFontSize(11);
+      .setValue('Performance by Reporting Category')
+      .setBackground(C.forestGreen).setFontColor(C.white).setFontWeight('bold').setFontSize(12);
+    sheet.setRowHeight(row, 26); row++;
+
+    shown.forEach(function(s) {
+      var tally = results[s.key].catTally || {};
+      if (Object.keys(tally).length === 0) return;
+
+      sheet.getRange(row, 1, 1, 6).merge()
+        .setValue(s.label.replace(' (separate)', ''))
+        .setBackground(C.sage).setFontColor(C.white).setFontWeight('bold');
+      row++;
+
+      var order = CATEGORY_ORDER[s.key] || Object.keys(tally);
+      order.forEach(function(code) {
+        if (!tally[code]) return;
+        var t = tally[code];
+        var pct = t.total ? Math.round(100 * t.correct / t.total) : 0;
+        sheet.getRange(row, 1, 1, 3).merge().setValue(CATEGORY_LABELS[code] || code);
+        sheet.getRange(row, 4).setValue(t.correct + ' / ' + t.total).setHorizontalAlignment('center');
+        sheet.getRange(row, 5, 1, 2).merge().setValue(pct + '%').setHorizontalAlignment('center')
+          .setFontColor(pct >= 75 ? C.forestGreen : (pct >= 50 ? '#B8860B' : C.red)).setFontWeight('bold');
+        row++;
+      });
+    });
+    row++;
+  }
+
+  // Missed questions per section
+  shown.forEach(function(s) {
+    var r = results[s.key];
+    sheet.getRange(row, 1, 1, 6).merge()
+      .setValue(s.label.replace(' (separate)', '') + '  —  Missed Questions')
+      .setBackground(C.sage).setFontColor(C.white).setFontWeight('bold').setFontSize(11);
     sheet.setRowHeight(row, 28); row++;
 
     if (r.missed.length === 0 && r.blanks.length === 0) {
       sheet.getRange(row, 1, 1, 4).merge()
         .setValue('✓  No missed or blank questions!')
-        .setFontColor(C.forestGreen).setFontWeight('bold').setFontStyle('normal');
+        .setFontColor(C.forestGreen).setFontWeight('bold');
       row++;
     } else {
       if (r.missed.length > 0) {
-        // Column headers
         ['Q#','Your Answer','Correct Answer'].forEach(function(h, i) {
-          sheet.getRange(row, i + 1).setValue(h)
-            .setBackground(C.subhead).setFontWeight('bold').setHorizontalAlignment('center');
+          sheet.getRange(row, i + 1).setValue(h).setBackground(C.subhead).setFontWeight('bold').setHorizontalAlignment('center');
         });
         row++;
-
         r.missed.forEach(function(m) {
           sheet.getRange(row, 1).setValue(m.q).setHorizontalAlignment('center');
-          sheet.getRange(row, 2).setValue(m.student)
-            .setBackground(C.lightRed).setFontColor(C.red)
-            .setFontWeight('bold').setHorizontalAlignment('center');
-          sheet.getRange(row, 3).setValue(m.correct)
-            .setBackground(C.lightGreen).setFontColor(C.forestGreen)
-            .setFontWeight('bold').setHorizontalAlignment('center');
+          sheet.getRange(row, 2).setValue(m.student).setBackground(C.lightRed).setFontColor(C.red).setFontWeight('bold').setHorizontalAlignment('center');
+          sheet.getRange(row, 3).setValue(m.correct).setBackground(C.lightGreen).setFontColor(C.forestGreen).setFontWeight('bold').setHorizontalAlignment('center');
           row++;
         });
       }
-
       if (r.blanks.length > 0) {
         sheet.getRange(row, 1, 1, 5).merge()
           .setValue('Left blank: Q' + r.blanks.join(', Q'))
@@ -539,11 +637,9 @@ function buildScoreReport(sheet, results, composite) {
         row++;
       }
     }
-
-    row++; // spacer between sections
+    row++;
   });
 
-  // Auto-size
   sheet.autoResizeColumns(1, 6);
 }
 
@@ -552,12 +648,9 @@ function buildScoreReport(sheet, results, composite) {
 // ============================================================
 
 function clearStudentAnswers() {
-  var ss  = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ans = ss.getSheetByName('Answer Sheet');
-  if (!ans) {
-    SpreadsheetApp.getUi().alert('Answer Sheet not found. Run Setup Sheet first.');
-    return;
-  }
+  if (!ans) { SpreadsheetApp.getUi().alert('Answer Sheet not found. Run Setup Sheet first.'); return; }
 
   var ui = SpreadsheetApp.getUi();
   if (ui.alert('Clear All Answers', 'Erase all student answers and reset the Score Report?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
@@ -568,18 +661,7 @@ function clearStudentAnswers() {
   ans.getRange('H3:H42').clearContent();
 
   var sr = ss.getSheetByName('Score Report');
-  if (sr) {
-    sr.clearContents();
-    sr.clearFormats();
-    sr.getRange('A1:F1').merge()
-      .setValue('Wildewood Education — ACT Score Report')
-      .setBackground(C.forestGreen).setFontColor(C.white).setFontWeight('bold').setFontSize(16).setHorizontalAlignment('center');
-    sr.getRange('A2:F2').merge()
-      .setValue('Run "Grade My Test" to generate your score report.')
-      .setBackground(C.sage).setFontColor(C.white).setFontSize(10).setHorizontalAlignment('center');
-    sr.setRowHeight(1, 50);
-    sr.setRowHeight(2, 28);
-  }
+  if (sr) resetScoreReport(sr);
 
   ss.setActiveSheet(ans);
   ui.alert('Done. All answers cleared.');
