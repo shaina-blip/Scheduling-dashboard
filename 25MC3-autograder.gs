@@ -67,12 +67,34 @@ var CATEGORY_ORDER = {
   science: ['IOD','SIN','EMI']
 };
 
-// Per-question category map (populated by classifier).
+// Per-question category map (best-effort classification, not official ACT labels).
 var QUESTION_CATEGORIES = {
-  english: {},
-  math: {},
-  reading: {},
-  science: {}
+  english: {
+    1:'CSE',2:'CSE',3:'POW',4:'POW',5:'POW',6:'CSE',7:'CSE',8:'POW',9:'CSE',10:'POW',
+    11:'CSE',12:'CSE',13:'POW',14:'CSE',15:'POW',16:'CSE',17:'KLA',18:'CSE',19:'KLA',20:'POW',
+    21:'POW',22:'CSE',23:'KLA',24:'CSE',25:'POW',26:'CSE',27:'POW',28:'KLA',29:'POW',30:'POW',
+    31:'KLA',32:'POW',33:'CSE',34:'POW',35:'CSE',36:'CSE',37:'CSE',38:'KLA',39:'POW',40:'POW',
+    41:'CSE',42:'KLA',43:'POW',44:'CSE',45:'CSE',46:'CSE',47:'POW',48:'POW',49:'POW',50:'CSE'
+  },
+  math: {
+    1:'PHM',2:'PHM',3:'PHM',4:'MDL',5:'PHM',6:'MDL',7:'PHM',8:'MDL',9:'PHM',10:'IES',
+    11:'PHM',12:'PHM',13:'IES',14:'PHM',15:'PHM',16:'PHM',17:'IES',18:'PHM',19:'PHM',20:'IES',
+    21:'PHM',22:'PHM',23:'PHM',24:'PHM',25:'PHM',26:'IES',27:'MDL',28:'PHM',29:'IES',30:'PHM',
+    31:'MDL',32:'MDL',33:'PHM',34:'IES',35:'PHM',36:'PHM',37:'PHM',38:'MDL',39:'MDL',40:'PHM',
+    41:'MDL',42:'PHM',43:'PHM',44:'PHM',45:'PHM'
+  },
+  reading: {
+    1:'CS',2:'KID',3:'KID',4:'CS',5:'KID',6:'CS',7:'KID',8:'CS',9:'CS',10:'KID',
+    11:'CS',12:'KID',13:'KID',14:'KID',15:'CS',16:'IKI',17:'IKI',18:'IKI',19:'CS',20:'KID',
+    21:'CS',22:'KID',23:'CS',24:'KID',25:'KID',26:'CS',27:'CS',28:'CS',29:'KID',30:'KID',
+    31:'KID',32:'KID',33:'CS',34:'KID',35:'KID',36:'KID'
+  },
+  science: {
+    1:'IOD',2:'IOD',3:'IOD',4:'IOD',5:'EMI',6:'IOD',7:'SIN',8:'EMI',9:'SIN',10:'SIN',
+    11:'EMI',12:'IOD',13:'IOD',14:'EMI',15:'IOD',16:'IOD',17:'IOD',18:'SIN',19:'SIN',20:'IOD',
+    21:'EMI',22:'EMI',23:'EMI',24:'EMI',25:'EMI',26:'EMI',27:'EMI',28:'EMI',29:'IOD',30:'SIN',
+    31:'IOD',32:'IOD',33:'SIN',34:'EMI',35:'IOD',36:'EMI',37:'IOD',38:'EMI',39:'EMI',40:'IOD'
+  }
 };
 
 // ============================================================
