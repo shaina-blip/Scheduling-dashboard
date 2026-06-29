@@ -127,6 +127,7 @@ var SETUP_TAB    = 'Setup Page';
 var NAME_CELL    = 'C4';
 var DATE_CELL    = 'C5';
 var SCIENCE_CELL = 'C6'; // checkbox: TRUE = taking Science
+var EXT_CELL     = 'C7'; // checkbox: TRUE = extended time (1.5x)
 
 // ============================================================
 // MENU
@@ -136,6 +137,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Wildewood ACT')
     .addItem('Grade My Test', 'gradeTest')
+    .addItem('Start Timer', 'showTimerSidebar')
     .addSeparator()
     .addItem('Clear Student Answers', 'clearStudentAnswers')
     .addSeparator()
@@ -165,10 +167,12 @@ function getSettings() {
   var sp = ss.getSheetByName(SETUP_TAB);
   if (!sp) return { name:'', date:'', science:true };
   var sci = sp.getRange(SCIENCE_CELL).getValue();
+  var ext = sp.getRange(EXT_CELL).getValue();
   return {
     name: sp.getRange(NAME_CELL).getValue(),
     date: sp.getRange(DATE_CELL).getValue(),
-    science: sci === true || sci === 'TRUE'
+    science: sci === true || sci === 'TRUE',
+    extended: ext === true || ext === 'TRUE'
   };
 }
 
@@ -302,27 +306,121 @@ function createSetupPage(ss) {
   sp.getRange(SCIENCE_CELL).insertCheckboxes();
   sp.getRange(SCIENCE_CELL).setValue(true);
 
-  [4,5,6].forEach(function(r){ sp.setRowHeight(r, 28); });
+  sp.getRange('B7').setValue('Extended time (1.5×)?').setFontWeight('bold').setHorizontalAlignment('right');
+  sp.getRange(EXT_CELL).insertCheckboxes();
+  sp.getRange(EXT_CELL).setValue(false);
+
+  [4,5,6,7].forEach(function(r){ sp.setRowHeight(r, 28); });
 
   // Helper note
-  sp.getRange('B8:C12').merge()
+  sp.getRange('B9:C14').merge()
     .setValue(
       'How this works:\n\n' +
       '• Type the student\'s name above — it appears on the Score Report.\n\n' +
-      '• Check the box if you ARE taking the optional Science section. ' +
-      'Uncheck it to take the core test only (English, Math, Reading).\n\n' +
-      '• Toggling the box automatically shows or hides the Science columns ' +
-      'on the Answer Sheet.\n\n' +
-      'Note: Your Composite is the average of English, Math, and Reading. ' +
+      '• Check "Science" if you ARE taking the optional Science section. ' +
+      'Unchecking it hides the Science columns on the Answer Sheet and the core test only (English, Math, Reading).\n\n' +
+      '• Check "Extended time" to give the timer 1.5× on each section (50% accommodation).\n\n' +
+      '• Open the timer from  Wildewood ACT ▸ Start Timer.\n\n' +
+      'Note: Composite = average of English, Math, and Reading. ' +
       'Science is reported separately (plus a STEM score with Math).')
     .setBackground(C.rowAlt).setFontColor('#2D2D2D').setFontSize(11)
     .setVerticalAlignment('top').setWrap(true)
     .setBorder(true,true,true,true,false,false, C.sage, SpreadsheetApp.BorderStyle.SOLID);
-  sp.setRowHeight(8, 30);
 
   // Hide gridlines for a cleaner look
   sp.setHiddenGridlines(true);
 }
+
+// ============================================================
+// TIMER SIDEBAR
+// ============================================================
+
+function showTimerSidebar() {
+  var s = getSettings();
+  var mult = s.extended ? 1.5 : 1;
+  var sections = [
+    { name: 'English', min: Math.round(35 * mult) },
+    { name: 'Math',    min: Math.round(50 * mult) },
+    { name: 'Break',   min: 10 },
+    { name: 'Reading', min: Math.round(40 * mult) }
+  ];
+  if (s.science) sections.push({ name: 'Science', min: Math.round(40 * mult) });
+
+  var html = TIMER_HTML
+    .replace('__SECTIONS__', JSON.stringify(sections))
+    .replace('__EXTENDED__', s.extended ? 'true' : 'false');
+
+  var out = HtmlService.createHtmlOutput(html).setTitle('ACT Timer');
+  SpreadsheetApp.getUi().showSidebar(out);
+}
+
+var TIMER_HTML = `<!DOCTYPE html><html><head><base target="_top"><style>
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#2D2D2D;}
+  .hdr{background:#2D5016;color:#fff;padding:12px;text-align:center;font-weight:bold;font-size:15px;}
+  .wrap{padding:16px;text-align:center;}
+  .ext{font-size:11px;color:#7A5C00;background:#FFF4D6;border-radius:4px;padding:4px 8px;display:inline-block;margin-bottom:10px;}
+  .progress{font-size:12px;color:#666;margin-bottom:4px;}
+  .secname{font-size:24px;font-weight:bold;color:#2D5016;}
+  .secmeta{font-size:12px;color:#888;margin-bottom:8px;}
+  .clock{font-size:56px;font-weight:bold;font-variant-numeric:tabular-nums;margin:8px 0;color:#2D5016;}
+  .clock.warn{color:#CC0000;}
+  button{font-family:inherit;font-size:14px;font-weight:bold;border:none;border-radius:6px;padding:10px 14px;margin:4px;cursor:pointer;}
+  .start{background:#8AAD6E;color:#fff;}
+  .reset{background:#eee;color:#444;}
+  .next{background:#2D5016;color:#fff;width:92%;margin-top:16px;padding:12px;}
+  .next:disabled{background:#cfcfcf;cursor:default;}
+  .done{font-size:13px;color:#2D5016;font-weight:bold;margin-top:10px;}
+</style></head><body>
+<div class="hdr">⏱ ACT Section Timer</div>
+<div class="wrap">
+  <div id="extbadge" class="ext" style="display:none;">Extended time 1.5× applied</div>
+  <div id="progress" class="progress"></div>
+  <div id="secname" class="secname"></div>
+  <div id="secmeta" class="secmeta"></div>
+  <div id="clock" class="clock">00:00</div>
+  <div>
+    <button class="start" id="startBtn" onclick="toggle()">Start</button>
+    <button class="reset" onclick="resetSection()">Reset</button>
+  </div>
+  <button class="next" id="nextBtn" onclick="nextSection()">Next Section ▶</button>
+  <div id="doneMsg" class="done" style="display:none;">✓ All sections complete!</div>
+</div>
+<script>
+  var SECTIONS = __SECTIONS__;
+  var EXTENDED = __EXTENDED__;
+  var idx = 0, remaining = 0, timer = null, running = false;
+
+  function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+  function render(){var c=document.getElementById('clock');c.textContent=fmt(remaining);c.className='clock'+(remaining<=60?' warn':'');}
+  function load(){
+    var sec=SECTIONS[idx];
+    remaining=sec.min*60;running=false;
+    if(timer){clearInterval(timer);timer=null;}
+    document.getElementById('secname').textContent=sec.name;
+    document.getElementById('secmeta').textContent=sec.min+' minutes';
+    document.getElementById('progress').textContent='Section '+(idx+1)+' of '+SECTIONS.length;
+    document.getElementById('startBtn').textContent='Start';
+    document.getElementById('nextBtn').disabled=(idx>=SECTIONS.length-1);
+    render();
+  }
+  function tick(){
+    if(remaining>0){remaining--;render();}
+    else{clearInterval(timer);timer=null;running=false;document.getElementById('startBtn').textContent='Start';beep();flash();}
+  }
+  function toggle(){
+    if(running){clearInterval(timer);timer=null;running=false;document.getElementById('startBtn').textContent='Resume';}
+    else{running=true;document.getElementById('startBtn').textContent='Pause';timer=setInterval(tick,1000);}
+  }
+  function resetSection(){load();}
+  function nextSection(){
+    if(idx<SECTIONS.length-1){idx++;load();}
+    if(idx>=SECTIONS.length-1 && SECTIONS.length>0){document.getElementById('doneMsg').style.display='block';}
+  }
+  function beep(){try{var a=new (window.AudioContext||window.webkitAudioContext)();var o=a.createOscillator();var g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=880;o.start();g.gain.setValueAtTime(0.3,a.currentTime);g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+1.2);o.stop(a.currentTime+1.2);}catch(e){}}
+  function flash(){var b=document.body,i=0,iv=setInterval(function(){b.style.background=(i%2?'#FFEBEE':'#fff');if(++i>6){clearInterval(iv);b.style.background='#fff';}},250);}
+  if(EXTENDED)document.getElementById('extbadge').style.display='inline-block';
+  load();
+</script></body></html>`;
 
 // ============================================================
 // DIRECTIONS BOX (+ timing chart) on the Answer Sheet
