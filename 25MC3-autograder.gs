@@ -366,14 +366,14 @@ function createSetupPage(ss) {
 
 function showTimerSidebar() {
   var s = getSettings();
-  var mult = s.extended ? 1.5 : 1;
+  // Pass BASE (un-multiplied) minutes; the sidebar applies 1.5x live via its own toggle.
   var sections = [
-    { name: 'English', min: Math.round(35 * mult) },
-    { name: 'Math',    min: Math.round(50 * mult) },
-    { name: 'Break',   min: 10 },
-    { name: 'Reading', min: Math.round(40 * mult) }
+    { name: 'English', base: 35 },
+    { name: 'Math',    base: 50 },
+    { name: 'Break',   base: 10 },
+    { name: 'Reading', base: 40 }
   ];
-  if (s.science) sections.push({ name: 'Science', min: Math.round(40 * mult) });
+  if (s.science) sections.push({ name: 'Science', base: 40 });
 
   var html = TIMER_HTML
     .replace('__SECTIONS__', JSON.stringify(sections))
@@ -387,7 +387,8 @@ var TIMER_HTML = `<!DOCTYPE html><html><head><base target="_top"><style>
   body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#2D2D2D;}
   .hdr{background:#2D5016;color:#fff;padding:12px;text-align:center;font-weight:bold;font-size:15px;}
   .wrap{padding:16px;text-align:center;}
-  .ext{font-size:11px;color:#7A5C00;background:#FFF4D6;border-radius:4px;padding:4px 8px;display:inline-block;margin-bottom:10px;}
+  .extctl{font-size:12px;color:#2D5016;background:#FFF4D6;border-radius:6px;padding:7px 10px;display:inline-block;margin-bottom:12px;cursor:pointer;font-weight:bold;}
+  .extctl input{vertical-align:middle;margin-right:6px;transform:scale(1.2);}
   .progress{font-size:12px;color:#666;margin-bottom:4px;}
   .secname{font-size:24px;font-weight:bold;color:#2D5016;}
   .secmeta{font-size:12px;color:#888;margin-bottom:8px;}
@@ -402,7 +403,7 @@ var TIMER_HTML = `<!DOCTYPE html><html><head><base target="_top"><style>
 </style></head><body>
 <div class="hdr">⏱ ACT Section Timer</div>
 <div class="wrap">
-  <div id="extbadge" class="ext" style="display:none;">Extended time 1.5× applied</div>
+  <label class="extctl"><input type="checkbox" id="extChk" onchange="applyExt()">Extended time (1.5×)</label>
   <div id="progress" class="progress"></div>
   <div id="secname" class="secname"></div>
   <div id="secmeta" class="secmeta"></div>
@@ -416,22 +417,24 @@ var TIMER_HTML = `<!DOCTYPE html><html><head><base target="_top"><style>
 </div>
 <script>
   var SECTIONS = __SECTIONS__;
-  var EXTENDED = __EXTENDED__;
   var idx = 0, remaining = 0, timer = null, running = false;
 
+  function ext(){return document.getElementById('extChk').checked;}
+  function mins(sec){return sec.name==='Break'?sec.base:Math.round(sec.base*(ext()?1.5:1));}
   function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
   function render(){var c=document.getElementById('clock');c.textContent=fmt(remaining);c.className='clock'+(remaining<=60?' warn':'');}
   function load(){
-    var sec=SECTIONS[idx];
-    remaining=sec.min*60;running=false;
+    var sec=SECTIONS[idx];var m=mins(sec);
+    remaining=m*60;running=false;
     if(timer){clearInterval(timer);timer=null;}
     document.getElementById('secname').textContent=sec.name;
-    document.getElementById('secmeta').textContent=sec.min+' minutes';
+    document.getElementById('secmeta').textContent=m+' minutes';
     document.getElementById('progress').textContent='Section '+(idx+1)+' of '+SECTIONS.length;
     document.getElementById('startBtn').textContent='Start';
     document.getElementById('nextBtn').disabled=(idx>=SECTIONS.length-1);
     render();
   }
+  function applyExt(){load();}
   function tick(){
     if(remaining>0){remaining--;render();}
     else{clearInterval(timer);timer=null;running=false;document.getElementById('startBtn').textContent='Start';beep();flash();}
@@ -447,7 +450,7 @@ var TIMER_HTML = `<!DOCTYPE html><html><head><base target="_top"><style>
   }
   function beep(){try{var a=new (window.AudioContext||window.webkitAudioContext)();var o=a.createOscillator();var g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=880;o.start();g.gain.setValueAtTime(0.3,a.currentTime);g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+1.2);o.stop(a.currentTime+1.2);}catch(e){}}
   function flash(){var b=document.body,i=0,iv=setInterval(function(){b.style.background=(i%2?'#FFEBEE':'#fff');if(++i>6){clearInterval(iv);b.style.background='#fff';}},250);}
-  if(EXTENDED)document.getElementById('extbadge').style.display='inline-block';
+  document.getElementById('extChk').checked = __EXTENDED__;
   load();
 </script></body></html>`;
 
