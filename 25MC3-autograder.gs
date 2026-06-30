@@ -129,6 +129,17 @@ var DATE_CELL    = 'C5';
 var SCIENCE_CELL = 'C6'; // checkbox: TRUE = taking Science
 var EXT_CELL     = 'C7'; // checkbox: TRUE = extended time (1.5x)
 
+// Answer Sheet layout: row 1 = test-link banner, row 2 = section headers,
+// row 3 = Q#/Answer sub-headers, questions start at Q_START.
+var Q_START = 4;
+var SECTION_TOTALS = { english: 50, math: 45, reading: 36, science: 40 };
+var SECTION_COL    = { english: 'B', math: 'D', reading: 'F', science: 'H' };
+
+function sectionRange(sec) {
+  var col = SECTION_COL[sec];
+  return col + Q_START + ':' + col + (Q_START + SECTION_TOTALS[sec] - 1);
+}
+
 // ============================================================
 // MENU
 // ============================================================
@@ -207,6 +218,9 @@ function setupSheet() {
 
   // ---- ANSWER SHEET tab ----
   var ans = ss.getSheetByName('Answer Sheet') || ss.insertSheet('Answer Sheet');
+  // Preserve any test link the user pasted into the top banner cell (A1).
+  var savedTopLink = null;
+  try { savedTopLink = ans.getRange('A1').getRichTextValue(); } catch (e) {}
   ans.getRange(1, 1, ans.getMaxRows(), ans.getMaxColumns()).breakApart();
   ans.clearContents();
   ans.clearFormats();
@@ -217,26 +231,41 @@ function setupSheet() {
     ans.setColumnWidth(col, col % 2 === 1 ? 48 : 90);
   });
 
+  // Row 1: test-link banner (A1:H1) — restores a saved link, else shows a prompt.
+  var banner = ans.getRange(1, 1, 1, 8).merge()
+    .setBackground('#FFFDE7').setFontColor('#2D5016').setFontWeight('bold')
+    .setFontSize(11).setHorizontalAlignment('center').setVerticalAlignment('middle')
+    .setBorder(true, true, true, true, false, false);
+  if (savedTopLink && (savedTopLink.getLinkUrl() || (savedTopLink.getText() || '').trim())) {
+    banner.setRichTextValue(savedTopLink);
+  } else {
+    banner.setValue('📝  Paste the test link in this cell');
+  }
+  ans.setRowHeight(1, 28);
+
+  // Row 2: section headers
   var sectionLabels = ['ENGLISH','MATH','READING','SCIENCE'];
   var sectionCols   = [1, 3, 5, 7];
   sectionLabels.forEach(function(label, i) {
-    ans.getRange(1, sectionCols[i], 1, 2).merge()
+    ans.getRange(2, sectionCols[i], 1, 2).merge()
       .setValue(label).setBackground(C.forestGreen).setFontColor(C.white)
       .setFontWeight('bold').setFontSize(11).setHorizontalAlignment('center');
   });
-  ans.setRowHeight(1, 32);
+  ans.setRowHeight(2, 32);
 
+  // Row 3: Q#/Answer sub-headers
   var subLabels = ['Q#','Answer','Q#','Answer','Q#','Answer','Q#','Answer'];
   [1,2,3,4,5,6,7,8].forEach(function(col, i) {
-    ans.getRange(2, col).setValue(subLabels[i])
+    ans.getRange(3, col).setValue(subLabels[i])
       .setBackground(C.sage).setFontColor(C.white)
       .setFontWeight('bold').setHorizontalAlignment('center');
   });
-  ans.setRowHeight(2, 26);
+  ans.setRowHeight(3, 26);
 
+  // Rows Q_START+: question numbers
   var totals = [50, 45, 36, 40];
   for (var i = 1; i <= 50; i++) {
-    var row = i + 2;
+    var row = i + (Q_START - 1);
     var bg = (i % 2 === 0) ? C.rowAlt : C.white;
     sectionCols.forEach(function(col, si) {
       if (i <= totals[si]) {
@@ -525,20 +554,24 @@ function removeAllProtections(ss) {
 
 function buildConditionalFormatting(sheet) {
   var rules = [];
+  var off = Q_START - 1; // question number = ROW() - off
   var cols = [
-    {col:'B', r1:3, r2:52, math:false},
-    {col:'D', r1:3, r2:47, math:true},
-    {col:'F', r1:3, r2:38, math:false},
-    {col:'H', r1:3, r2:42, math:false}
+    {sec:'english', math:false},
+    {sec:'math',    math:true},
+    {sec:'reading', math:false},
+    {sec:'science', math:false}
   ];
   cols.forEach(function(c) {
-    var rng = sheet.getRange(c.col + c.r1 + ':' + c.col + c.r2);
+    var col = SECTION_COL[c.sec];
+    var r1 = Q_START, r2 = Q_START + SECTION_TOTALS[c.sec] - 1;
+    var first = col + r1;
+    var rng = sheet.getRange(col + r1 + ':' + col + r2);
     var oddValid  = c.math ? '"A","B","C","D","E"' : '"A","B","C","D"';
     var evenValid = c.math ? '"F","G","H","J","K"' : '"F","G","H","J"';
-    var oddFormula  = '=AND(' + c.col + c.r1 + '<>"",MOD(ROW()-2,2)=1,NOT(OR(' +
-      oddValid.split(',').map(function(v){ return 'UPPER('+c.col+c.r1+')='+v; }).join(',') + ')))';
-    var evenFormula = '=AND(' + c.col + c.r1 + '<>"",MOD(ROW()-2,2)=0,NOT(OR(' +
-      evenValid.split(',').map(function(v){ return 'UPPER('+c.col+c.r1+')='+v; }).join(',') + ')))';
+    var oddFormula  = '=AND(' + first + '<>"",MOD(ROW()-' + off + ',2)=1,NOT(OR(' +
+      oddValid.split(',').map(function(v){ return 'UPPER('+first+')='+v; }).join(',') + ')))';
+    var evenFormula = '=AND(' + first + '<>"",MOD(ROW()-' + off + ',2)=0,NOT(OR(' +
+      evenValid.split(',').map(function(v){ return 'UPPER('+first+')='+v; }).join(',') + ')))';
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(oddFormula)
       .setBackground('#FF6600').setFontColor(C.white).setRanges([rng]).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(evenFormula)
@@ -560,16 +593,12 @@ function gradeTest() {
   var settings = getSettings();
   var includeScience = settings.science;
 
-  var ranges = {
-    english: 'B3:B52', math: 'D3:D47', reading: 'F3:F38', science: 'H3:H42'
-  };
-
   var sections = ['english','math','reading'];
   if (includeScience) sections.push('science');
 
   var results = {};
   sections.forEach(function(sec) {
-    var vals = ans.getRange(ranges[sec]).getValues().map(function(r){ return r[0]; });
+    var vals = ans.getRange(sectionRange(sec)).getValues().map(function(r){ return r[0]; });
     results[sec] = gradeSection(sec, vals);
     results[sec].scaled = rawToScaled(sec, results[sec].raw);
   });
@@ -775,10 +804,10 @@ function clearStudentAnswers() {
   var ui = SpreadsheetApp.getUi();
   if (ui.alert('Clear All Answers', 'Erase all student answers and reset the Score Report?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
 
-  ans.getRange('B3:B52').clearContent();
-  ans.getRange('D3:D47').clearContent();
-  ans.getRange('F3:F38').clearContent();
-  ans.getRange('H3:H42').clearContent();
+  ans.getRange(sectionRange('english')).clearContent();
+  ans.getRange(sectionRange('math')).clearContent();
+  ans.getRange(sectionRange('reading')).clearContent();
+  ans.getRange(sectionRange('science')).clearContent();
 
   var sr = ss.getSheetByName('Score Report');
   if (sr) resetScoreReport(sr);
